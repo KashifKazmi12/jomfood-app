@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- You can define colors here -->
+    <color name="primary_color">#FFFFFF</color>
+    <!-- Splash screen background color - matches React Native splash screen -->
+    <color name="splash_background">#FFFFFF</color>
+</resources>
+

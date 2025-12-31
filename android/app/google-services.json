@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "225222312566",
+    "project_id": "jomsmart-76336",
+    "storage_bucket": "jomsmart-76336.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:225222312566:android:81bed9fdd4c97159e3d557",
+        "android_client_info": {
+          "package_name": "com.jomfood"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAObPvXW-sjJyWGMo9UpAnh7qG_plNoM0A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -15,6 +15,7 @@ export const configureGoogleSignIn = () => {
   //check if in debug or release mode then according pass the google_client_id_debug or google_client_id
   GoogleSignin.configure({
     webClientId: __DEV__ ? SECRETS.google_client_id_debug : SECRETS.google_client_id, // From Google Cloud Console
+    iosClientId: SECRETS.google_client_id, // Explicitly pass iOS Client ID for RNGoogleSignin
     offlineAccess: true, // If you want to access Google API on behalf of the user FROM YOUR SERVER
     forceCodeForRefreshToken: true, // [Android] related to `serverAuthCode`, read the docs link below *.
   });

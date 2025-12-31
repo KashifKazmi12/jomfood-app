@@ -43,6 +43,9 @@ export const requestNotificationPermission = async () => {
  */
 export const getFCMToken = async () => {
   try {
+    if (Platform.OS === 'ios') {
+      await messaging().registerDeviceForRemoteMessages();
+    }
     const token = await messaging().getToken();
     console.log('✅ FCM Token:', token);
     return token;

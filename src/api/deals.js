@@ -4,30 +4,30 @@ import i18n from '../i18n/config';
 // Normalize responses that can be either array or { deals, pagination }
 const normalizeDealsResponse = (res) => {
   if (!res) return { deals: [], pagination: null };
-  
+
   // Handle structure: { success: true, data: { deals: [...], pagination: {...} } }
   if (res.data && res.data.data && Array.isArray(res.data.data.deals)) {
-    return { 
-      deals: res.data.data.deals, 
-      pagination: res.data.data.pagination || null 
+    return {
+      deals: res.data.data.deals,
+      pagination: res.data.data.pagination || null
     };
   }
-  
+
   // Handle structure: { data: { deals: [...], pagination: {...} } }
   if (res.data && Array.isArray(res.data.deals)) {
     return { deals: res.data.deals, pagination: res.data.pagination || null };
   }
-  
+
   // Handle structure: { data: [...] } (array directly)
   if (Array.isArray(res.data)) {
     return { deals: res.data, pagination: null };
   }
-  
+
   // Some APIs might return array directly
   if (Array.isArray(res)) {
     return { deals: res, pagination: null };
   }
-  
+
   return { deals: [], pagination: null };
 };
 
@@ -54,18 +54,18 @@ export const dealsAPI = {
   listActive: async (params = {}) => {
     // console.log('🔍 [dealsAPI.listActive] Received params:', params);
     const query = new URLSearchParams();
-    
+
     // Add language parameter
     const lang = getApiLanguage();
     if (lang && typeof lang === 'string') {
       query.append('lang', lang);
     }
-    
+
     // Add required params
     query.append('sort_by', params.sort_by ?? 'newest');
     query.append('page', String(params.page ?? 1));
     query.append('limit', String(params.limit ?? 12));
-    
+
     // Add optional params
     if (params.deal_type) query.append('deal_type', params.deal_type);
     if (params.min_price) query.append('min_price', String(params.min_price));
@@ -80,12 +80,14 @@ export const dealsAPI = {
     if (params.longitude) query.append('lng', String(params.longitude));
     if (params.radius_km) query.append('radius_km', String(params.radius_km));
     if (params.is_hot_deal) query.append('is_hot_deal', 'true');
-    
+    if (params.business_id) query.append('business_id', params.business_id);
+    if (params.business) query.append('business', params.business);
+
     // Handle tags array - join with comma
     if (params.tags && Array.isArray(params.tags) && params.tags.length > 0) {
       query.append('tags', params.tags.join(','));
     }
-    
+
     const queryString = query.toString();
     // console.log('🌐 [dealsAPI.listActive] Final query string:', queryString);
     const res = await api.get(`/jomfood-deals/active?${queryString}`);
@@ -95,10 +97,10 @@ export const dealsAPI = {
   detail: async (dealId) => {
     // Validate dealId is a valid MongoDB ObjectId (24 hex characters)
     if (!dealId || typeof dealId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(dealId)) {
-      throw { 
-        message: 'Invalid deal ID format', 
+      throw {
+        message: 'Invalid deal ID format',
         error: 'INVALID_DEAL_ID',
-        dealId 
+        dealId
       };
     }
     const lang = getApiLanguage();
@@ -110,17 +112,17 @@ export const dealsAPI = {
   claim: async ({ dealId, customerId }) => {
     // Validate IDs are valid MongoDB ObjectIds (24 hex characters)
     if (!dealId || typeof dealId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(dealId)) {
-      throw { 
-        message: 'Invalid deal ID format', 
+      throw {
+        message: 'Invalid deal ID format',
         error: 'INVALID_DEAL_ID',
-        dealId 
+        dealId
       };
     }
     if (!customerId || typeof customerId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(customerId)) {
-      throw { 
-        message: 'Invalid customer ID format', 
+      throw {
+        message: 'Invalid customer ID format',
         error: 'INVALID_CUSTOMER_ID',
-        customerId 
+        customerId
       };
     }
     // Add language parameter
@@ -134,29 +136,29 @@ export const dealsAPI = {
 
   getClaimHistory: async (params = {}) => {
     const query = new URLSearchParams();
-    
+
     // Add language parameter
     const lang = getApiLanguage();
     if (lang && typeof lang === 'string') {
       query.append('lang', lang);
     }
-    
+
     // Add other params with validation
     if (params.customer_id) {
       // Validate customer_id is a valid MongoDB ObjectId
       if (typeof params.customer_id === 'string' && /^[0-9a-fA-F]{24}$/.test(params.customer_id)) {
         query.append('customer_id', params.customer_id);
       } else {
-        throw { 
-          message: 'Invalid customer ID format', 
+        throw {
+          message: 'Invalid customer ID format',
           error: 'INVALID_CUSTOMER_ID',
-          customer_id: params.customer_id 
+          customer_id: params.customer_id
         };
       }
     }
     if (params.page) query.append('page', String(params.page));
     if (params.limit) query.append('limit', String(params.limit));
-    
+
     const queryString = query.toString();
     const res = await api.get(`/jomfood-deals/claims/history${queryString ? `?${queryString}` : ''}`);
     // Response structure: { success: true, data: { claims: [...], pagination: {...} } }
@@ -196,13 +198,13 @@ export const dealsAPI = {
   // Get active deal categories
   getActiveDealCategories: async (params = {}) => {
     const query = new URLSearchParams();
-    
+
     // Add language parameter
     const lang = getApiLanguage();
     if (lang && typeof lang === 'string') {
       query.append('lang', lang);
     }
-    
+
     if (params.show_category !== undefined) {
       query.append('show_category', String(params.show_category));
     }
@@ -217,20 +219,20 @@ export const dealsAPI = {
   },
   getJomfoodCategories: async (params = {}) => {
     const query = new URLSearchParams();
-    
+
     // Default params
     if (params.limit !== undefined) {
       query.append('limit', String(params.limit));
     } else {
       query.append('limit', '999999');
     }
-    
+
     if (params.is_active !== undefined) {
       query.append('is_active', String(params.is_active));
     } else {
       query.append('is_active', 'true');
     }
-    
+
     const queryString = query.toString();
     const res = await api.get(`/jomfood-categories?${queryString}`);
     // Response structure: { success: true, data: [...], pagination: {...} }
@@ -249,20 +251,20 @@ export const dealsAPI = {
   getDealsByCategory: async (dealCategoryId, params = {}) => {
     // console.log('🔍 [dealsAPI.getDealsByCategory] Category:', dealCategoryId, 'Params:', params);
     const query = new URLSearchParams();
-    
+
     // Add language parameter
     const lang = getApiLanguage();
     if (lang && typeof lang === 'string') {
       query.append('lang', lang);
     }
-    
+
     // Add category ID
     query.append('deal_category_id', dealCategoryId);
-    
+
     // Add pagination
     query.append('limit', String(params.limit ?? 10));
     if (params.page) query.append('page', String(params.page));
-    
+
     // Add optional filter params
     if (params.sort_by) query.append('sort_by', params.sort_by);
     if (params.deal_type) query.append('deal_type', params.deal_type);
@@ -275,12 +277,14 @@ export const dealsAPI = {
     if (params.latitude) query.append('lat', String(params.latitude));
     if (params.longitude) query.append('lng', String(params.longitude));
     if (params.radius_km) query.append('radius_km', String(params.radius_km));
-    
+    if (params.business_id) query.append('business_id', params.business_id);
+    if (params.business) query.append('business', params.business);
+
     // Handle tags array
     if (params.tags && Array.isArray(params.tags) && params.tags.length > 0) {
       query.append('tags', params.tags.join(','));
     }
-    
+
     const queryString = query.toString();
     // console.log('🌐 [dealsAPI.getDealsByCategory] Final query:', queryString);
     const res = await api.get(`/jomfood-deals/active?${queryString}`);

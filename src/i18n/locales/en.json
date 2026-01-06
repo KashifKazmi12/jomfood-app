@@ -94,7 +94,11 @@
     "days": "DAYS",
     "hours": "HRS",
     "minutes": "MIN",
-    "seconds": "SEC"
+    "seconds": "SEC",
+    "goBack": "Go Back",
+    "restaurantNotFound": "Restaurant not found",
+    "restaurant": "Restaurant",
+    "active": "Active"
   },
   "home": {
     "popularOffers": "Popular Weekly Offers",
@@ -148,6 +152,10 @@
     "price": "Price",
     "discount": "Discount"
   },
+  "dealModal": {
+    "openInGoogleMaps": "Open in Maps",
+    "contactViaWhatsApp": "WhatsApp"
+  },
   "login": {
     "title": "Login",
     "welcomeBack": "Welcome back",
@@ -172,6 +180,7 @@
   },
   "deals": {
     "allDeals": "All Deals",
+    "hotDealsToday": "Hot Deals Today",
     "nearMe": "Near Me",
     "myDeals": "Please sign in to view your deals",
     "claimed": "Claimed",
@@ -298,7 +307,7 @@
     "rightsContact": "To exercise your rights, contact us at: info@jomfood.my",
     "contactUs": "Contact Us",
     "contactDescription": "If you have any questions about this Privacy Policy, please contact us at:",
-    "section7Title": "Third-Party Links",
+    "section7Title": "Pautan Pihak Ketiga",
     "thirdPartyLinksDesc": "jomfood.my may contain links to:",
     "link1": "Restaurant websites",
     "link2": "Food delivery platforms",

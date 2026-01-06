@@ -37,7 +37,7 @@ export default function DealDetailScreen() {
   const user = useSelector(state => state.auth.user);
   const queryClient = useQueryClient();
   const { id } = (route?.params || {});
-  
+
   // Phone prompt states
   const [showPhonePrompt, setShowPhonePrompt] = useState(false);
   const [phoneInput, setPhoneInput] = useState('');
@@ -106,7 +106,7 @@ export default function DealDetailScreen() {
   const [isFavorite, setIsFavorite] = React.useState(false);
   const [isTogglingFavorite, setIsTogglingFavorite] = React.useState(false);
   const [timeRemaining, setTimeRemaining] = React.useState(null);
-  
+
   // Check if deal is expired based on end_date
   const isDealExpired = React.useMemo(() => {
     if (!deal?.end_date) return false;
@@ -166,7 +166,7 @@ export default function DealDetailScreen() {
         const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((difference % (1000 * 60)) / 1000);
-        
+
         setTimeRemaining({
           days: String(days).padStart(2, '0'),
           hours: String(hours).padStart(2, '0'),
@@ -211,7 +211,7 @@ export default function DealDetailScreen() {
   const handleLoginPress = () => {
     setLoginModalVisible(false);
     // Navigate to login with return params
-    navigation.navigate('Login', { 
+    navigation.navigate('Login', {
       returnTo: 'DealDetail',
       returnParams: { id: id }
     });
@@ -237,19 +237,19 @@ export default function DealDetailScreen() {
     try {
       const result = await favoritesAPI.toggleFavorite(id);
       console.log('🔄 [DealDetailScreen] Toggle favorite result:', result);
-      
+
       // Response structure: { success: true, data: { is_favorite: true, message: "..." } }
       if (result?.success && result?.data) {
         const isFavoriteNow = result.data.is_favorite === true;
         setIsFavorite(isFavoriteNow);
-        
+
         // Show success message
         const message = result.data.message || (isFavoriteNow ? 'Added to favorites' : 'Removed from favorites');
         showToast.success(
           isFavoriteNow ? 'Added to favorites' : 'Removed from favorites',
           message
         );
-        
+
         // Invalidate favorites queries to refresh lists
         queryClient.invalidateQueries({ queryKey: ['favorite-deals'] });
       } else {
@@ -297,15 +297,15 @@ export default function DealDetailScreen() {
     try {
       const lat = parseFloat(latitude);
       const lng = parseFloat(longitude);
-      
+
       // Open Google Maps with the coordinates
       const url = Platform.select({
         ios: `maps://app?daddr=${lat},${lng}&directionsmode=driving`,
         android: `google.navigation:q=${lat},${lng}`,
       });
-      
+
       const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-      
+
       // Try to open native maps app first
       const canOpen = await Linking.canOpenURL(url || '');
       if (canOpen && url) {
@@ -337,7 +337,7 @@ export default function DealDetailScreen() {
         queryClient.setQueryData(['user-profile'], response.user);
       }
       setShowPhonePrompt(false);
-      
+
       // If we were trying to claim, continue with the claim
       if (pendingClaim) {
         setPendingClaim(false);
@@ -371,7 +371,7 @@ export default function DealDetailScreen() {
       setLoginModalVisible(true);
       return;
     }
-    
+
     // Check if user has phone number
     if (!user.phone) {
       setPhoneInput('');
@@ -380,7 +380,7 @@ export default function DealDetailScreen() {
       setShowPhonePrompt(true);
       return;
     }
-    
+
     // Prevent multiple clicks
     if (isClaiming) {
       return;
@@ -547,7 +547,17 @@ export default function DealDetailScreen() {
                 <Text style={styles.restaurantLogoText}>{company?.substring(0, 2).toUpperCase() || 'R'}</Text>
               </View>
               <View style={styles.restaurantDetails}>
-                <Text style={styles.restaurantName}>{company || 'Restaurant'}</Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    const bizId = deal?.business_id?._id;
+                    if (bizId) {
+                      navigation.navigate('RestaurantDetails', { id: bizId });
+                    }
+                  }}
+                >
+                  <Text style={styles.restaurantName}>{company || 'Restaurant'}</Text>
+                </TouchableOpacity>
                 {location && (
                   <Text style={styles.restaurantLocation}>{location}</Text>
                 )}
@@ -555,7 +565,7 @@ export default function DealDetailScreen() {
               {/* Action Icons - Vertical Stack */}
               <View style={styles.restaurantActions}>
                 {officePhone && (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.actionIconButton, styles.whatsappBg]}
                     onPress={handleWhatsAppPress}
                     activeOpacity={0.7}
@@ -564,7 +574,7 @@ export default function DealDetailScreen() {
                   </TouchableOpacity>
                 )}
                 {latitude && longitude && (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.actionIconButton, styles.mapBg]}
                     onPress={handleMapPress}
                     activeOpacity={0.7}
@@ -673,8 +683,8 @@ export default function DealDetailScreen() {
           {/* Claim Deal Button - Only show if deal is not expired */}
           {!isDealExpired && !timeRemaining?.expired && (
             <View style={styles.bottomButtonContainer}>
-              <TouchableOpacity 
-                style={[styles.claimButton, isClaiming && styles.claimButtonDisabled]} 
+              <TouchableOpacity
+                style={[styles.claimButton, isClaiming && styles.claimButtonDisabled]}
                 onPress={claim}
                 disabled={isClaiming}
               >
@@ -690,7 +700,7 @@ export default function DealDetailScreen() {
             </View>
           )}
         </View>
-      </ScrollView>
+      </ScrollView >
 
       <ClaimedDealModal
         visible={claimVisible}
@@ -798,7 +808,7 @@ export default function DealDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </View >
   );
 }
 
@@ -1443,7 +1453,7 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontSize: typography.fontSize.base,
     fontFamily: typography.fontFamily.semiBold,
   },
-  
+
   // Phone Modal Styles
   phoneModalCard: {
     backgroundColor: colors.white,

@@ -42,7 +42,8 @@ const colors = {
   textDark: '#0F1A12',     // Darker green-black for strong contrast
 
   // Background Colors (remove beige/orange bias)
-  background: '#FFFFFF',
+  background: 'rgba(253, 139, 24, 0.11)',
+  // background: '#FFFFFF',
   backgroundLight: '#F3F7F4', // faint green-tinted neutral
   backgroundDark: '#11261A',  // deep green-black for dark mode surfaces
   surface: '#FFFFFF',

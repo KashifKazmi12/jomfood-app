@@ -219,16 +219,16 @@ const DealCard = React.memo(function DealCard({ deal, onView, onQuickClaim, colo
   const discountText = React.useMemo(() => {
     const dealType = deal?.deal_type;
     if (dealType === 'percentage') {
-      return `${deal?.discount_percentage ?? 0}% OFF`;
+      return `${deal?.discount_percentage ?? 0}% ${t('deals.off')}`;
     }
     if (dealType === 'fixed_amount') {
-      return `RM ${(deal?.discount_amount ?? 0).toFixed(2)} OFF`;
+      return `RM ${(deal?.discount_amount ?? 0).toFixed(2)} ${t('deals.off')}`;
     }
     if (dealType === 'combo') {
-      return 'COMBO DEAL';
+      return t('deals.comboDeal');
     }
-    return 'DEAL';
-  }, [deal]);
+    return t('deals.deal');
+  }, [deal, t]);
 
   return (
     <View style={[styles.card, { width: CARD_WIDTH }]}>

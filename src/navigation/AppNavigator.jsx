@@ -30,6 +30,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
 import DealDetailScreen from '../screens/DealDetailScreen';
+import RestaurantDetailsScreen from '../screens/RestaurantDetailsScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 
@@ -49,9 +50,9 @@ export const BottomNavigationSpace = 100;
 // ==========================================
 // Wrapper component to add bottom safe area + tab bar padding to screens with bottom tabs
 function withBottomSafeArea(Component) {
-  return function WrappedComponent(props) { 
-    const insets = useSafeAreaInsets(); 
-    return ( 
+  return function WrappedComponent(props) {
+    const insets = useSafeAreaInsets();
+    return (
       <View style={{ flex: 1, paddingBottom: 0, backgroundColor: 'transparent' }} >
         {/* paddingBottom removed - navigation now floats over content */}
         {/* paddingBottom: insets.bottom + 100 - Uncomment to reserve space for navigation */}
@@ -69,9 +70,9 @@ function CustomTabBar({ state, descriptors, navigation }) {
   const typography = useThemeTypography();
   const insets = useSafeAreaInsets();
   const styles = getTabBarStyles(colors, typography, insets);
-  
+
   return (
-    
+
     <View style={styles.tabBarContainer}>
       {/* Custom background color behind navigation (only affects this area) */}
       <View style={styles.tabBarBackground} />
@@ -108,7 +109,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
             const color = isFocused ? colors.primary : colors.textMuted;
             let Icon = Home;
             let label = t('navigation.home');
-            
+
             if (route.name === 'Deals') {
               Icon = MapPin;
               label = t('navigation.nearMe');
@@ -132,7 +133,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
                 style={styles.tabButton}
               >
                 <Icon color={color} size={24} />
-                <Text 
+                <Text
                   style={[styles.tabLabel, { color }]}
                   numberOfLines={1}
                   adjustsFontSizeToFit={true}
@@ -158,7 +159,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
 function HomeStackNavigator() {
   const colors = useThemeColors();
   const HomeStack = createNativeStackNavigator();
-  
+
   return (
     <HomeStack.Navigator
       screenOptions={{
@@ -182,6 +183,13 @@ function HomeStackNavigator() {
           headerBackTitleVisible: false,
         }}
       />
+      <HomeStack.Screen
+        name="RestaurantDetails"
+        component={withBottomSafeArea(RestaurantDetailsScreen)}
+        options={{
+          headerShown: false,
+        }}
+      />
     </HomeStack.Navigator>
   );
 }
@@ -190,7 +198,7 @@ function HomeStackNavigator() {
 function DealsStackNavigator() {
   const colors = useThemeColors();
   const DealsStack = createNativeStackNavigator();
-  
+
   return (
     <DealsStack.Navigator
       screenOptions={{
@@ -215,6 +223,13 @@ function DealsStackNavigator() {
           headerBackTitleVisible: false,
         }}
       />
+      <DealsStack.Screen
+        name="RestaurantDetails"
+        component={withBottomSafeArea(RestaurantDetailsScreen)}
+        options={{
+          headerShown: false,
+        }}
+      />
     </DealsStack.Navigator>
   );
 }
@@ -223,7 +238,7 @@ function DealsStackNavigator() {
 function MyDealsStackNavigator() {
   const colors = useThemeColors();
   const MyDealsStack = createNativeStackNavigator();
-  
+
   return (
     <MyDealsStack.Navigator
       screenOptions={{
@@ -247,6 +262,13 @@ function MyDealsStackNavigator() {
           headerBackTitleVisible: false,
         }}
       />
+      <MyDealsStack.Screen
+        name="RestaurantDetails"
+        component={withBottomSafeArea(RestaurantDetailsScreen)}
+        options={{
+          headerShown: false,
+        }}
+      />
     </MyDealsStack.Navigator>
   );
 }
@@ -255,7 +277,7 @@ function MyDealsStackNavigator() {
 function ProfileStackNavigator() {
   const colors = useThemeColors();
   const ProfileStack = createNativeStackNavigator();
-  
+
   return (
     <ProfileStack.Navigator
       screenOptions={{
@@ -279,6 +301,13 @@ function ProfileStackNavigator() {
           headerBackTitleVisible: false,
         }}
       />
+      <ProfileStack.Screen
+        name="RestaurantDetails"
+        component={withBottomSafeArea(RestaurantDetailsScreen)}
+        options={{
+          headerShown: false,
+        }}
+      />
     </ProfileStack.Navigator>
   );
 }
@@ -288,7 +317,7 @@ function ProfileStackNavigator() {
 // ==========================================
 function RootTabsWithStack() {
   const colors = useThemeColors();
-  
+
   return (
     <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
@@ -307,23 +336,23 @@ function RootTabsWithStack() {
         },
       })}
     >
-      <Tab.Screen 
-        name="Home" 
+      <Tab.Screen
+        name="Home"
         component={HomeStackNavigator}
         options={{ tabBarLabel: 'Home' }}
       />
-      <Tab.Screen 
-        name="Deals" 
+      <Tab.Screen
+        name="Deals"
         component={DealsStackNavigator}
         options={{ tabBarLabel: 'Near Me' }}
       />
-      <Tab.Screen 
-        name="MyDeals" 
+      <Tab.Screen
+        name="MyDeals"
         component={MyDealsStackNavigator}
         options={{ tabBarLabel: 'My Deals' }}
       />
-      <Tab.Screen 
-        name="Profile" 
+      <Tab.Screen
+        name="Profile"
         component={ProfileStackNavigator}
         options={{ tabBarLabel: 'Profile' }}
       />
@@ -338,7 +367,7 @@ function RootTabsWithStack() {
 export default function AppNavigator() {
   const colors = useThemeColors();
   const typography = useThemeTypography();
-  
+
   return (
     <NavigationContainer
       theme={{
@@ -382,16 +411,16 @@ function AppNavigatorContent() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { currentNotification, pendingNavigation, handleNotificationDismiss, setPendingNavigation } = useNotifications();
-  
+
   // Handle navigation when app opens from notification (closed/background state)
   useEffect(() => {
     if (pendingNavigation) {
       console.log('🔔 [AppNavigator] Handling pending navigation:', JSON.stringify(pendingNavigation, null, 2));
-      
+
       const notificationData = pendingNavigation?.data || pendingNavigation;
       const type = notificationData?.type || notificationData?.notificationType || pendingNavigation?.type;
       const dealId = notificationData?.dealId || notificationData?.deal_id || pendingNavigation?.dealId || pendingNavigation?.deal_id;
-      
+
       console.log('🔍 [AppNavigator] Pending navigation check:', {
         type,
         dealId,
@@ -400,7 +429,7 @@ function AppNavigatorContent() {
         notificationDataKeys: Object.keys(notificationData || {}),
         pendingNavigationKeys: Object.keys(pendingNavigation || {}),
       });
-      
+
       // Small delay to ensure navigation is ready
       const timer = setTimeout(() => {
         try {
@@ -448,23 +477,23 @@ function AppNavigatorContent() {
           setPendingNavigation(null);
         }
       }, 500);
-      
+
       return () => clearTimeout(timer);
     }
   }, [pendingNavigation, navigation, setPendingNavigation]);
-  
+
   const handleNotificationPress = (notification) => {
     console.log('🔔 [AppNavigator] Notification banner clicked:', JSON.stringify(notification, null, 2));
-    
+
     handleNotificationDismiss();
-    
+
     // Check notification type and navigate accordingly
     // For push notifications, data is in notification.data
     // For API notifications, data might be directly on notification object
     const notificationData = notification?.data || notification;
     const type = notificationData?.type || notificationData?.notificationType || notification?.type;
     const dealId = notificationData?.dealId || notificationData?.deal_id || notification?.dealId || notification?.deal_id;
-    
+
     console.log('🔍 [AppNavigator] Navigation check:', {
       type,
       dealId,
@@ -473,7 +502,7 @@ function AppNavigatorContent() {
       notificationDataKeys: Object.keys(notificationData || {}),
       notificationKeys: Object.keys(notification || {}),
     });
-    
+
     try {
       if (type === 'deal' && dealId) {
         console.log('🚀 [AppNavigator] Navigating to DealDetail with dealId:', dealId);
@@ -516,7 +545,7 @@ function AppNavigatorContent() {
       console.error('❌ [AppNavigator] Error in notification press handler:', error);
     }
   };
-  
+
   return (
     <>
       <Stack.Navigator
@@ -539,12 +568,12 @@ function AppNavigatorContent() {
         {/* ==========================================
             SCREENS WITH BOTTOM TAB NAVIGATION
             ========================================== */}
-        
+
         {/* Root Tabs (Home, Deals, MyDeals, Profile + DealDetail) - HAS BOTTOM TABS */}
         <Stack.Screen
           name="RootTabs"
           component={RootTabsWithStack}
-          options={{ 
+          options={{
             headerShown: false,
             contentStyle: {
               backgroundColor: 'transparent',

@@ -94,7 +94,11 @@
     "days": "HARI",
     "hours": "JAM",
     "minutes": "MIN",
-    "seconds": "SAAT"
+    "seconds": "SAAT",
+    "goBack": "Kembali",
+    "restaurantNotFound": "Restoran tidak dijumpai",
+    "restaurant": "Restoran",
+    "active": "Aktif"
   },
   "home": {
     "popularOffers": "Tawaran Popular Mingguan",
@@ -148,6 +152,10 @@
     "price": "Harga",
     "discount": "Diskaun"
   },
+  "dealModal": {
+    "openInGoogleMaps": "Buka dalam Peta",
+    "contactViaWhatsApp": "WhatsApp"
+  },
   "login": {
     "title": "Log Masuk",
     "welcomeBack": "Selamat kembali",
@@ -172,6 +180,7 @@
   },
   "deals": {
     "allDeals": "Semua Tawaran",
+    "hotDealsToday": "Tawaran Panas Hari Ini",
     "nearMe": "Berhampiran Saya",
     "myDeals": "Sila log masuk untuk melihat tawaran anda",
     "claimed": "Dituntut",
@@ -302,7 +311,7 @@
     "thirdPartyLinksDesc": "jomfood.my mungkin mengandungi pautan ke:",
     "link1": "Laman web restoran",
     "link2": "Platform penghantaran makanan",
-    "link3": "Pembekal tawaran luaran",
+    "link3": "External deal providers",
     "thirdPartyLinksNote": "Kami tidak bertanggungjawab terhadap amalan privasi laman luaran. Sila semak dasar mereka secara berasingan.",
     "section8Title": "Privasi Kanak-kanak",
     "childrenDesc": "jomfood.my tidak sengaja mengumpul maklumat daripada kanak-kanak di bawah umur 13 tahun.\nJika data sedemikian dikumpulkan tanpa sengaja, kami akan memadamkannya dengan segera setelah ditemui.",

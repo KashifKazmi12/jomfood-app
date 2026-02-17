@@ -82,6 +82,7 @@ export const dealsAPI = {
     if (params.is_hot_deal) query.append('is_hot_deal', 'true');
     if (params.business_id) query.append('business_id', params.business_id);
     if (params.business) query.append('business', params.business);
+    if (params.take_one_item_from_each_restaurant) query.append('take_one_item_from_each_restaurant', params.take_one_item_from_each_restaurant)
 
     // Handle tags array - join with comma
     if (params.tags && Array.isArray(params.tags) && params.tags.length > 0) {
@@ -109,7 +110,7 @@ export const dealsAPI = {
     return res?.data || res;
   },
 
-  claim: async ({ dealId, customerId }) => {
+  claim: async ({ dealId, customerId, preferredServiceType, preferredDatetime }) => {
     // Validate IDs are valid MongoDB ObjectIds (24 hex characters)
     if (!dealId || typeof dealId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(dealId)) {
       throw {
@@ -128,9 +129,14 @@ export const dealsAPI = {
     // Add language parameter
     const lang = getApiLanguage();
     const langParam = (lang && typeof lang === 'string') ? `?lang=${lang}` : '';
-    const res = await api.post(`/jomfood-deals/${dealId}/claim${langParam}`, {
-      customer_id: customerId,
-    });
+    const payload = { customer_id: customerId };
+    if (preferredServiceType) {
+      payload.preferred_service_type = preferredServiceType;
+    }
+    if (preferredDatetime) {
+      payload.preferred_datetime = preferredDatetime;
+    }
+    const res = await api.post(`/jomfood-deals/${dealId}/claim${langParam}`, payload);
     return res?.data || res;
   },
 
@@ -169,6 +175,56 @@ export const dealsAPI = {
       };
     }
     return { claims: [], pagination: null };
+  },
+
+  rescheduleClaim: async ({ claimId, customerId, preferredDatetime }) => {
+    if (!claimId || typeof claimId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(claimId)) {
+      throw {
+        message: 'Invalid claim ID format',
+        error: 'INVALID_CLAIM_ID',
+        claimId
+      };
+    }
+    if (!customerId || typeof customerId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(customerId)) {
+      throw {
+        message: 'Invalid customer ID format',
+        error: 'INVALID_CUSTOMER_ID',
+        customerId
+      };
+    }
+    if (!preferredDatetime || typeof preferredDatetime !== 'string') {
+      throw {
+        message: 'Preferred datetime is required',
+        error: 'MISSING_PREFERRED_DATETIME',
+        preferredDatetime
+      };
+    }
+    const res = await api.post(`/jomfood-deals/claims/${claimId}/reschedule`, {
+      customer_id: customerId,
+      preferred_datetime: preferredDatetime,
+    });
+    return res?.data || res;
+  },
+
+  cancelClaim: async ({ claimId, customerId }) => {
+    if (!claimId || typeof claimId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(claimId)) {
+      throw {
+        message: 'Invalid claim ID format',
+        error: 'INVALID_CLAIM_ID',
+        claimId
+      };
+    }
+    if (!customerId || typeof customerId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(customerId)) {
+      throw {
+        message: 'Invalid customer ID format',
+        error: 'INVALID_CUSTOMER_ID',
+        customerId
+      };
+    }
+    const res = await api.post(`/jomfood-deals/claims/${claimId}/cancel`, {
+      customer_id: customerId,
+    });
+    return res?.data || res;
   },
 
   getDealOfTheDay: async () => {
@@ -293,5 +349,3 @@ export const dealsAPI = {
 };
 
 export default dealsAPI;
-
-

@@ -55,7 +55,8 @@ export default function DealsScreen() {
             max_price: incoming.max_price ? Number(incoming.max_price) : 500,
             min_discount: incoming.min_discount ? Number(incoming.min_discount) : 0,
             max_discount: incoming.max_discount ? Number(incoming.max_discount) : 100,
-            category_id: incoming.category_id || incoming.deal_category_id || '',
+            category_id: incoming.category_id || '', // For jomfood-categories
+            deal_category_id: incoming.deal_category_id || '', // For jomfood-deal-categories
             company_name: incoming.company_name || '',
             radius_km: incoming.radius_km || '',
             latitude: incoming.latitude || '',
@@ -81,7 +82,8 @@ export default function DealsScreen() {
     max_price: initialFilters.max_price ? Number(initialFilters.max_price) : 500,
     min_discount: initialFilters.min_discount ? Number(initialFilters.min_discount) : 0,
     max_discount: initialFilters.max_discount ? Number(initialFilters.max_discount) : 100,
-            category_id: initialFilters.category_id || initialFilters.deal_category_id || '',
+    category_id: initialFilters.category_id || '', // For jomfood-categories
+    deal_category_id: initialFilters.deal_category_id || '', // For jomfood-deal-categories
     company_name: initialFilters.company_name || '',
     radius_km: initialFilters.radius_km || '',
     latitude: initialFilters.latitude || '',
@@ -146,6 +148,7 @@ export default function DealsScreen() {
         ...(filters.max_discount < 100 ? { max_discount: filters.max_discount } : {}),
         ...(filters.deal_type ? { deal_type: filters.deal_type } : {}),
         ...(filters.category_id ? { category_id: filters.category_id } : {}),
+        ...(filters.deal_category_id ? { deal_category_id: filters.deal_category_id } : {}),
         ...(filters.company_name ? { company_name: filters.company_name } : {}),
         ...(filters.latitude ? { latitude: filters.latitude } : {}),
         ...(filters.longitude ? { longitude: filters.longitude } : {}),
@@ -186,6 +189,7 @@ export default function DealsScreen() {
       min_discount: 0,
       max_discount: 100,
       category_id: '',
+      deal_category_id: '',
       company_name: '',
       radius_km: '',
       latitude: '',

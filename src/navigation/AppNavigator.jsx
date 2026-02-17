@@ -29,10 +29,14 @@ import MyDealsScreen from '../screens/MyDealsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
+import VerificationScreen from '../screens/VerificationScreen';
 import DealDetailScreen from '../screens/DealDetailScreen';
 import RestaurantDetailsScreen from '../screens/RestaurantDetailsScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import CartScreen from '../screens/CartScreen';
+import CartPaymentStatusScreen from '../screens/CartPaymentStatusScreen';
+import CartPaymentWebViewScreen from '../screens/CartPaymentWebViewScreen';
 
 // Theme
 import useThemeColors from '../theme/useThemeColors';
@@ -606,6 +610,16 @@ function AppNavigatorContent() {
           }}
         />
 
+        {/* Verification Screen - NO BOTTOM TABS */}
+        {/* Added for Email Verification Flow */}
+        <Stack.Screen
+          name="Verification"
+          component={VerificationScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+
         {/* Privacy Policy Screen - NO BOTTOM TABS */}
         <Stack.Screen
           name="PrivacyPolicy"
@@ -622,6 +636,30 @@ function AppNavigatorContent() {
           component={NotificationsScreen}
           options={{
             title: t('notifications.notifications'),
+            headerBackTitleVisible: false,
+          }}
+        />
+        <Stack.Screen
+          name="Cart"
+          component={CartScreen}
+          options={{
+            title: t('cart.title', 'Your Cart'),
+            headerBackTitleVisible: false,
+          }}
+        />
+        <Stack.Screen
+          name="CartPaymentStatus"
+          component={CartPaymentStatusScreen}
+          options={{
+            title: t('cart.paymentProcessing', 'Payment'),
+            headerBackTitleVisible: false,
+          }}
+        />
+        <Stack.Screen
+          name="CartPaymentWebView"
+          component={CartPaymentWebViewScreen}
+          options={{
+            title: t('cart.paymentProcessing', 'Payment'),
             headerBackTitleVisible: false,
           }}
         />
@@ -725,5 +763,3 @@ const getTabBarStyles = (colors, typography, insets) => StyleSheet.create({
     maxWidth: '100%',
   },
 });
-
-

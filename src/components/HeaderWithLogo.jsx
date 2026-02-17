@@ -3,12 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
-import { SlidersHorizontal } from 'lucide-react-native';
+import { ShoppingCart, SlidersHorizontal } from 'lucide-react-native';
 import Logo from './Logo';
 import NotificationBell from './NotificationBell';
 import useThemeColors from '../theme/useThemeColors';
 import useThemeTypography from '../theme/useThemeTypography';
 import { Image } from 'react-native';
+import { useCart } from '../context/CartContext';
 
 /**
  * HeaderWithLogo Component
@@ -36,6 +37,8 @@ function HeaderWithLogo({
   const colors = useThemeColors();
   const typography = useThemeTypography();
   const styles = getStyles(colors, typography);
+  const { items } = useCart();
+  const cartCount = items.reduce((sum, item) => sum + Number(item.quantity || 1), 0);
 
   const handleAvatarPress = useCallback(() => {
     if (onAvatarPress) {
@@ -93,7 +96,21 @@ function HeaderWithLogo({
 
       {/* Right side actions: Notification Bell (only if logged in) + Filter */}
       <View style={styles.rightActions}>
-        {user && <NotificationBell />}
+        {/*{user && <NotificationBell />}*/}
+        <TouchableOpacity
+          style={styles.iconBtn}
+          onPress={() => navigation.navigate('Cart')}
+          activeOpacity={0.7}
+          accessibilityLabel={t('cart.open', 'Open cart')}
+          testID="cart-button"
+        >
+          <ShoppingCart size={20} color={colors.primary} />
+          {cartCount > 0 && (
+            <View style={styles.cartBadge}>
+              <Text style={styles.cartBadgeText}>{cartCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
         <TouchableOpacity 
           style={styles.iconBtn} 
           onPress={handleSearchPress}
@@ -142,6 +159,23 @@ const getStyles = (colors, typography) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FE8100',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  cartBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontFamily: typography.fontFamily.semiBold,
   },
   avatar: {
     width: 40,

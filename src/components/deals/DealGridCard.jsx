@@ -3,10 +3,11 @@ import { View, Text, StyleSheet, Image, TouchableOpacity, Linking, Platform } fr
 import { useTranslation } from 'react-i18next';
 import useThemeColors from '../../theme/useThemeColors';
 import useThemeTypography from '../../theme/useThemeTypography';
-import { MapPin, Phone, Store } from 'lucide-react-native';
+import { MapPin, Phone, Store, Share2 } from 'lucide-react-native';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { openWhatsApp } from '../../utils/whatsapp';
 import { showToast } from '../toast';
+import ShareDealModal from './ShareDealModal';
 
 function DealGridCard({ deal, onView, onQuickClaim }) {
   const { t } = useTranslation();
@@ -26,9 +27,14 @@ function DealGridCard({ deal, onView, onQuickClaim }) {
   const price = deal?.deal_total ?? null;
   const originalPrice = deal?.original_total ?? null;
   const company = deal?.business_id?.company_name || deal?.group_id?.name || 'Restaurant';
+  const area = deal?.business_id?.area || '';
   const latitude = deal?.business_id?.lat || '';
   const longitude = deal?.business_id?.lng || '';
   const officePhone = deal?.business_id?.office_phone || '';
+  const [shareVisible, setShareVisible] = React.useState(false);
+
+  const dealLink = deal?._id ? `https://jomfood.my/?dealId=${deal._id}&autoOpen=true` : 'https://jomfood.my';
+  const shareMessage = `Hey! Check out this awesome deal I found for ${name} at ${company}! Check it out here: ${dealLink} Let's go together!`;
 
   const handleWhatsAppPress = useCallback(async (e) => {
     e.stopPropagation(); // Prevent card click
@@ -131,6 +137,12 @@ function DealGridCard({ deal, onView, onQuickClaim }) {
               </View>
             )}
           </View>
+          {area ? (
+            <View style={styles.areaRow}>
+              <MapPin size={10} color={colors.textMuted} strokeWidth={2} />
+              <Text numberOfLines={1} style={styles.areaText}>{area}</Text>
+            </View>
+          ) : null}
           <View style={styles.pricingRow}>
             <View style={styles.pricingContainer}>
               {price != null && (
@@ -168,9 +180,27 @@ function DealGridCard({ deal, onView, onQuickClaim }) {
       >
         <Text style={styles.addText}>+</Text>
       </TouchableOpacity> */}
-      <View style={styles.dealTypeBadge}>
-        <Text style={styles.dealTypeBadgeText}>{discountText}</Text>
+      <View style={styles.badgeRow}>
+        <TouchableOpacity
+          style={styles.shareButton}
+          onPress={(e) => {
+            e.stopPropagation();
+            setShareVisible(true);
+          }}
+          activeOpacity={0.8}
+        >
+          <Share2 size={14} color={colors.textMuted} />
+        </TouchableOpacity>
+        <View style={styles.dealTypeBadge}>
+          <Text style={styles.dealTypeBadgeText}>{discountText}</Text>
+        </View>
       </View>
+      <ShareDealModal
+        visible={shareVisible}
+        onClose={() => setShareVisible(false)}
+        link={dealLink}
+        message={shareMessage}
+      />
     </View>
   );
 }
@@ -230,6 +260,23 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontSize: typography.fontSize.xs,
     color: colors.text,
     fontFamily: typography.fontFamily.medium,
+  },
+  areaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primaryLighter,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginTop: -2,
+    marginBottom: 6,
+  },
+  areaText: {
+    fontSize: typography.fontSize.xxs,
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.regular,
   },
   iconButtons: {
     flexDirection: 'row',
@@ -311,10 +358,15 @@ const getStyles = (colors, typography) => StyleSheet.create({
     lineHeight: 28,
     fontFamily: typography.fontFamily.semiBold,
   },
-  dealTypeBadge: {
+  badgeRow: {
     position: 'absolute',
     right: 14,
-    bottom: 14,
+    bottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  dealTypeBadge: {
     backgroundColor: colors.primary,
     paddingHorizontal: 6,
     paddingVertical: 1,
@@ -328,6 +380,16 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily.semiBold,
   },
+  shareButton: {
+    width: 22,
+    height: 22,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
 });
 
 // Memoize component to prevent unnecessary re-renders
@@ -337,4 +399,3 @@ export default React.memo(DealGridCard, (prevProps, nextProps) => {
          prevProps.onView === nextProps.onView &&
          prevProps.onQuickClaim === nextProps.onQuickClaim;
 });
-

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, FlatList, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, FlatList, RefreshControl, Modal, KeyboardAvoidingView, TouchableWithoutFeedback, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
@@ -9,13 +9,15 @@ import GradientBackground from '../components/GradientBackground';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { dealsAPI } from '../api/deals';
 import { favoritesAPI } from '../api/favorites';
-import { Clock, CheckCircle, XCircle, Calendar, ShoppingBag, Heart } from 'lucide-react-native';
+import { Clock, CheckCircle, XCircle, Calendar, ShoppingBag, Heart, X } from 'lucide-react-native';
 import ClaimedDealBottomSheet from '../components/deals/ClaimedDealBottomSheet';
 import useThemeTypography from '../theme/useThemeTypography';
 import LoginPrompt from '../components/LoginPrompt';
 import HeaderWithLogo from '../components/HeaderWithLogo';
 import DealGridCard from '../components/deals/DealGridCard';
 import DealGridCardSkeleton from '../components/deals/DealGridCardSkeleton';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import { showToast } from '../components/toast';
 
 export default function MyDealsScreen() {
   const { t } = useTranslation();
@@ -27,6 +29,17 @@ export default function MyDealsScreen() {
   const [selectedClaim, setSelectedClaim] = React.useState(null);
   const [bottomSheetVisible, setBottomSheetVisible] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('claimed'); // 'claimed' or 'favorites'
+  const [rescheduleVisible, setRescheduleVisible] = React.useState(false);
+  const [rescheduleClaim, setRescheduleClaim] = React.useState(null);
+  const [rescheduleDateValue, setRescheduleDateValue] = React.useState(null);
+  const [rescheduleTimeValue, setRescheduleTimeValue] = React.useState(null);
+  const [rescheduleError, setRescheduleError] = React.useState('');
+  const [rescheduleSubmitting, setRescheduleSubmitting] = React.useState(false);
+  const [iosPickerVisible, setIosPickerVisible] = React.useState(false);
+  const [iosPickerMode, setIosPickerMode] = React.useState('date');
+  const [iosPickerValue, setIosPickerValue] = React.useState(new Date());
+  const [cancelConfirmVisible, setCancelConfirmVisible] = React.useState(false);
+  const [cancelTarget, setCancelTarget] = React.useState(null);
 
   // Get user ID - try both _id and id
   const userId = user?._id;
@@ -196,14 +209,27 @@ export default function MyDealsScreen() {
         });
       };
 
+      const formatServiceType = (serviceType) => {
+        if (!serviceType) return 'N/A';
+        const normalized = String(serviceType).toLowerCase().replace(/_/g, '-');
+        if (normalized === 'dine-in' || normalized === 'dinein') return 'Dine-in';
+        if (normalized === 'self-pickup' || normalized === 'pickup') return 'Self pickup';
+        if (normalized === 'delivery') return 'Delivery';
+        return serviceType;
+      };
+
+      const status = String(claim.status || 'active').toLowerCase();
+
       return {
         id: claim._id,
         dealId: claim.deal_id?._id || claim.deal_id,
         dealName,
         businessName,
         price: dealPrice,
-        status: claim.status || 'active',
+        status,
         claimedAt: formatDate(claim.claimed_at),
+        scheduledAt: formatDate(claim.preferred_datetime),
+        preferredServiceType: formatServiceType(claim.preferred_service_type),
         expiresAt: formatDate(claim.expires_at),
         redeemedAt: formatDate(claim.redeemed_at),
         // Store full claim object for bottom sheet
@@ -244,6 +270,131 @@ export default function MyDealsScreen() {
     setBottomSheetVisible(true);
   };
 
+  const openRescheduleModal = (claim) => {
+    setRescheduleClaim(claim);
+    setRescheduleDateValue(null);
+    setRescheduleTimeValue(null);
+    setRescheduleError('');
+    setRescheduleVisible(true);
+  };
+
+  const formatDateDisplay = (dateValue) => {
+    if (!dateValue) return '';
+    return dateValue.toLocaleDateString('en-US');
+  };
+
+  const formatTimeDisplay = (timeValue) => {
+    if (!timeValue) return '';
+    return timeValue.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  };
+
+  const openDateTimePicker = (mode) => {
+    if (Platform.OS === 'android') {
+      const currentValue = mode === 'date'
+        ? (rescheduleDateValue || new Date())
+        : (rescheduleTimeValue || new Date());
+      const minimumDate = mode === 'date' ? new Date() : undefined;
+      DateTimePickerAndroid.open({
+        value: currentValue,
+        mode,
+        is24Hour: false,
+        minimumDate,
+        onChange: (event, selectedDate) => {
+          if (event.type !== 'set' || !selectedDate) return;
+          if (mode === 'date') {
+            setRescheduleDateValue(selectedDate);
+          } else {
+            setRescheduleTimeValue(selectedDate);
+          }
+          setRescheduleError('');
+        },
+      });
+      return;
+    }
+
+    const currentValue = mode === 'date'
+      ? (rescheduleDateValue || new Date())
+      : (rescheduleTimeValue || new Date());
+    setIosPickerMode(mode);
+    setIosPickerValue(currentValue);
+    setIosPickerVisible(true);
+  };
+
+  const buildRescheduleDatetime = () => {
+    if (!rescheduleDateValue || !rescheduleTimeValue) return null;
+    return new Date(
+      rescheduleDateValue.getFullYear(),
+      rescheduleDateValue.getMonth(),
+      rescheduleDateValue.getDate(),
+      rescheduleTimeValue.getHours(),
+      rescheduleTimeValue.getMinutes(),
+      0,
+      0
+    );
+  };
+
+  const submitReschedule = async () => {
+    if (!rescheduleClaim?._id) {
+      setRescheduleError('Missing claim information.');
+      return;
+    }
+    if (!rescheduleDateValue || !rescheduleTimeValue) {
+      setRescheduleError('Please select both date and time.');
+      return;
+    }
+    const nextDate = buildRescheduleDatetime();
+    if (!nextDate || Number.isNaN(nextDate.getTime())) {
+      setRescheduleError('Invalid date or time.');
+      return;
+    }
+    if (nextDate.getTime() <= Date.now()) {
+      setRescheduleError('Please select a future date and time.');
+      return;
+    }
+
+    setRescheduleSubmitting(true);
+    try {
+      const res = await dealsAPI.rescheduleClaim({
+        claimId: rescheduleClaim._id,
+        customerId: userId,
+        preferredDatetime: nextDate.toISOString(),
+      });
+      const message = res?.message || res?.data?.message || 'Deal claim rescheduled successfully';
+      showToast.success('Success', message);
+      setRescheduleVisible(false);
+      setRescheduleClaim(null);
+      refetch();
+    } catch (error) {
+      showToast.error('Error', error?.message || 'Failed to reschedule deal');
+    } finally {
+      setRescheduleSubmitting(false);
+    }
+  };
+
+  const cancelClaim = async (claim) => {
+    if (!claim?._id) return;
+    try {
+      const res = await dealsAPI.cancelClaim({ claimId: claim._id, customerId: userId });
+      const message = res?.message || res?.data?.message || 'Deal claim cancelled successfully';
+      showToast.success('Success', message);
+      refetch();
+    } catch (error) {
+      showToast.error('Error', error?.message || 'Failed to cancel deal');
+    }
+  };
+
+  const openCancelConfirm = (claim) => {
+    setCancelTarget(claim);
+    setCancelConfirmVisible(true);
+  };
+
+  const confirmCancel = async () => {
+    if (!cancelTarget) return;
+    setCancelConfirmVisible(false);
+    await cancelClaim(cancelTarget);
+    setCancelTarget(null);
+  };
+
   // Render history item
   const renderHistoryItem = ({ item: claim }) => (
     <TouchableOpacity
@@ -279,6 +430,20 @@ export default function MyDealsScreen() {
             <Text style={styles.historyDate}>{claim.claimedAt}</Text>
           </View>
         </View>
+
+        {claim.preferredServiceType !== 'N/A' && (
+          <View style={styles.historyMetaRow}>
+            <Text style={styles.historyMetaLabel}>Preferred Service Type:</Text>
+            <Text style={styles.historyMetaValue}>{claim.preferredServiceType}</Text>
+          </View>
+        )}
+
+        {claim.scheduledAt !== 'N/A' && (
+          <View style={styles.historyMetaRow}>
+            <Text style={styles.historyMetaLabel}>Scheduled At:</Text>
+            <Text style={styles.historyMetaValue}>{claim.scheduledAt}</Text>
+          </View>
+        )}
         
         {claim.status === 'active' && claim.expiresAt !== 'N/A' && (
           <View style={styles.expiryContainer}>
@@ -287,6 +452,29 @@ export default function MyDealsScreen() {
             </Text>
           </View>
         )}
+
+        {/* {claim.status === 'active' && (
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={styles.rescheduleButton}
+              onPress={(event) => {
+                event?.stopPropagation?.();
+                openRescheduleModal(claim.fullClaim);
+              }}
+            >
+              <Text style={styles.rescheduleButtonText}>Reschedule</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={(event) => {
+                event?.stopPropagation?.();
+                openCancelConfirm(claim.fullClaim);
+              }}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )} */}
       </View>
     </TouchableOpacity>
   );
@@ -377,12 +565,12 @@ export default function MyDealsScreen() {
             size={18} 
             color={activeTab === 'claimed' ? colors.primary : colors.textMuted} 
           />
-          <Text style={[
-            styles.tabText,
-            activeTab === 'claimed' && styles.tabTextActive
-          ]}>
-            {t('deals.claimed')}
-          </Text>
+            <Text style={[
+              styles.tabText,
+              activeTab === 'claimed' && styles.tabTextActive
+            ]}>
+              {t('myDeals.tabLabel', 'My Deals')}
+            </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'favorites' && styles.tabActive]}
@@ -554,6 +742,154 @@ export default function MyDealsScreen() {
         />
       </View>
       </SafeAreaView>
+
+      {/* Reschedule Modal */}
+      <Modal
+        visible={rescheduleVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setRescheduleVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <TouchableWithoutFeedback onPress={() => setRescheduleVisible(false)}>
+            <View style={styles.modalBackdrop} />
+          </TouchableWithoutFeedback>
+          <View style={styles.rescheduleModalCard}>
+            <View style={styles.rescheduleHeaderRow}>
+              <Text style={styles.rescheduleTitle}>Reschedule Deal</Text>
+              <TouchableOpacity onPress={() => setRescheduleVisible(false)}>
+                <X size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.rescheduleSubtitle}>Choose a new date and time for your deal</Text>
+
+            <Text style={styles.rescheduleSectionLabel}>Preferred Date *</Text>
+            <TouchableOpacity
+              style={styles.rescheduleInput}
+              onPress={() => openDateTimePicker('date')}
+            >
+              <Text style={rescheduleDateValue ? styles.rescheduleInputText : styles.rescheduleInputPlaceholder}>
+                {rescheduleDateValue ? formatDateDisplay(rescheduleDateValue) : 'Select date'}
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={styles.rescheduleSectionLabel}>Preferred Time *</Text>
+            <TouchableOpacity
+              style={styles.rescheduleInput}
+              onPress={() => openDateTimePicker('time')}
+            >
+              <Text style={rescheduleTimeValue ? styles.rescheduleInputText : styles.rescheduleInputPlaceholder}>
+                {rescheduleTimeValue ? formatTimeDisplay(rescheduleTimeValue) : 'Select time'}
+              </Text>
+            </TouchableOpacity>
+
+            {rescheduleError ? <Text style={styles.rescheduleError}>{rescheduleError}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.reschedulePrimaryButton, rescheduleSubmitting && styles.rescheduleButtonDisabled]}
+              onPress={submitReschedule}
+              disabled={rescheduleSubmitting}
+            >
+              <Text style={styles.reschedulePrimaryText}>
+                {rescheduleSubmitting ? 'Rescheduling...' : 'Reschedule'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.rescheduleSecondaryButton}
+              onPress={() => setRescheduleVisible(false)}
+              disabled={rescheduleSubmitting}
+            >
+              <Text style={styles.rescheduleSecondaryText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* iOS Date/Time Picker Modal */}
+      <Modal
+        visible={iosPickerVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIosPickerVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setIosPickerVisible(false)}>
+          <View style={styles.modalBackdrop} />
+        </TouchableWithoutFeedback>
+        <View style={styles.iosPickerCard}>
+          <DateTimePicker
+            value={iosPickerValue}
+            mode={iosPickerMode}
+            display="spinner"
+            minimumDate={iosPickerMode === 'date' ? new Date() : undefined}
+            onChange={(event, selectedDate) => {
+              if (selectedDate) {
+                setIosPickerValue(selectedDate);
+              }
+            }}
+          />
+          <View style={styles.iosPickerActions}>
+            <TouchableOpacity
+              style={styles.rescheduleSecondaryButton}
+              onPress={() => setIosPickerVisible(false)}
+            >
+              <Text style={styles.rescheduleSecondaryText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.reschedulePrimaryButton}
+              onPress={() => {
+                if (iosPickerMode === 'date') {
+                  setRescheduleDateValue(iosPickerValue);
+                } else {
+                  setRescheduleTimeValue(iosPickerValue);
+                }
+                setRescheduleError('');
+                setIosPickerVisible(false);
+              }}
+            >
+              <Text style={styles.reschedulePrimaryText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Cancel Confirmation Modal */}
+      <Modal
+        visible={cancelConfirmVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setCancelConfirmVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <TouchableWithoutFeedback onPress={() => setCancelConfirmVisible(false)}>
+            <View style={styles.modalBackdrop} />
+          </TouchableWithoutFeedback>
+          <View style={styles.confirmModalCard}>
+            <Text style={styles.confirmTitle}>Cancel Deal?</Text>
+            <Text style={styles.confirmSubtitle}>Are you sure you want to cancel this deal?</Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={styles.confirmNoButton}
+                onPress={() => setCancelConfirmVisible(false)}
+              >
+                <Text style={styles.confirmNoText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmYesButton}
+                onPress={confirmCancel}
+              >
+                <Text style={styles.confirmYesText}>Yes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </GradientBackground>
   );
 }
@@ -655,7 +991,7 @@ const getStyles = (colors, typography) => StyleSheet.create({
     elevation: 2,
   },
   historyItemContent: {
-    gap: 1,
+    gap: 2,
   },
   historyItemHeader: {
     flexDirection: 'row',
@@ -726,8 +1062,23 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.textMuted,
   },
-  expiryContainer: {
+  historyMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
     marginTop: 0,
+  },
+  historyMetaLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textMuted,
+  },
+  historyMetaValue: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text,
+    fontFamily: typography.fontFamily.semiBold,
+  },
+  expiryContainer: {
+    marginTop: 4,
     paddingTop: 4,
     borderTopWidth: 1,
     borderTopColor: colors.border,
@@ -736,6 +1087,39 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.warning || colors.textMuted,
     fontStyle: 'italic',
+  },
+  actionRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  rescheduleButton: {
+    flex: 1,
+    backgroundColor: '#FE8100',
+    borderRadius: 6,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rescheduleButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.base,
+    fontFamily: typography.fontFamily.semiBold,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: colors.backgroundLight || '#F5F5F5',
+    borderRadius: 6,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cancelButtonText: {
+    color: colors.text,
+    fontSize: typography.fontSize.base,
+    fontFamily: typography.fontFamily.semiBold,
   },
   loadingContainer: {
     flex: 1,
@@ -759,5 +1143,174 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontSize: typography.fontSize.base,
     marginBottom: 16,
   },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  rescheduleModalCard: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 20,
+    width: '88%',
+    maxWidth: 420,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  rescheduleHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  rescheduleTitle: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.semiBold,
+    color: colors.text,
+  },
+  rescheduleSubtitle: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textMuted,
+    marginBottom: 16,
+  },
+  rescheduleSectionLabel: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.semiBold,
+    color: colors.text,
+    marginBottom: 8,
+  },
+  rescheduleInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: colors.white,
+    marginBottom: 14,
+  },
+  rescheduleInputText: {
+    color: colors.text,
+    fontSize: typography.fontSize.base,
+    fontFamily: typography.fontFamily.regular,
+  },
+  rescheduleInputPlaceholder: {
+    color: colors.textMuted,
+    fontSize: typography.fontSize.base,
+    fontFamily: typography.fontFamily.regular,
+  },
+  rescheduleError: {
+    color: colors.error || '#d32f2f',
+    fontSize: 12,
+    fontFamily: typography.fontFamily.medium,
+    marginBottom: 12,
+  },
+  reschedulePrimaryButton: {
+    backgroundColor: '#FE8100',
+    borderRadius: 6,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  reschedulePrimaryText: {
+    color: colors.white,
+    fontSize: typography.fontSize.base,
+    fontFamily: typography.fontFamily.semiBold,
+  },
+  rescheduleSecondaryButton: {
+    backgroundColor: colors.backgroundLight || '#F5F5F5',
+    borderRadius: 6,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  rescheduleSecondaryText: {
+    color: colors.text,
+    fontSize: typography.fontSize.base,
+    fontFamily: typography.fontFamily.semiBold,
+  },
+  rescheduleButtonDisabled: {
+    opacity: 0.7,
+  },
+  iosPickerCard: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 20,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  iosPickerActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmModalCard: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 20,
+    width: '80%',
+    maxWidth: 360,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  confirmTitle: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.semiBold,
+    color: colors.text,
+    marginBottom: 6,
+  },
+  confirmSubtitle: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textMuted,
+    marginBottom: 16,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  confirmNoButton: {
+    flex: 1,
+    backgroundColor: colors.backgroundLight || '#F5F5F5',
+    borderRadius: 6,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  confirmNoText: {
+    color: colors.text,
+    fontSize: typography.fontSize.base,
+    fontFamily: typography.fontFamily.semiBold,
+  },
+  confirmYesButton: {
+    flex: 1,
+    backgroundColor: '#FE8100',
+    borderRadius: 6,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmYesText: {
+    color: colors.white,
+    fontSize: typography.fontSize.base,
+    fontFamily: typography.fontFamily.semiBold,
+  },
 });
-

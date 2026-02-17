@@ -22,7 +22,7 @@ import ViewShot from 'react-native-view-shot';
 import RNFS from 'react-native-fs';
 import useThemeColors from '../../theme/useThemeColors';
 import { showToast } from '../toast';
-import { X, Calendar, MapPin, DollarSign, Clock, CheckCircle, XCircle, Eye, EyeOff, ExternalLink } from 'lucide-react-native';
+import { X, Calendar, MapPin, DollarSign, Clock, CheckCircle, XCircle, Eye, EyeOff, ExternalLink, ShoppingBag } from 'lucide-react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DRAG_THRESHOLD = 100; // Minimum drag distance to close
@@ -218,6 +218,15 @@ export default function ClaimedDealBottomSheet({ visible, onClose, data }) {
     });
   };
 
+  const formatServiceType = (serviceType) => {
+    if (!serviceType) return 'N/A';
+    const normalized = String(serviceType).toLowerCase().replace(/_/g, '-');
+    if (normalized === 'dine-in' || normalized === 'dinein') return 'Dine-in';
+    if (normalized === 'self-pickup' || normalized === 'pickup') return 'Self pickup';
+    if (normalized === 'delivery') return 'Delivery';
+    return serviceType;
+  };
+
   const businessName = data.business_id?.company_name || data.group_id?.name || 'Unknown Business';
   const dealName = data.deal_name || 'Deal';
   const dealPrice = data.deal_total || 0;
@@ -341,6 +350,22 @@ export default function ClaimedDealBottomSheet({ visible, onClose, data }) {
                   <View style={styles.infoContent}>
                     <Text style={styles.infoLabel}>Claimed At</Text>
                     <Text style={styles.infoValue}>{formatDate(data.claimed_at)}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.infoRow}>
+                  <ShoppingBag size={18} color={colors.textMuted} />
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoLabel}>Preferred Service Type</Text>
+                    <Text style={styles.infoValue}>{formatServiceType(data.preferred_service_type)}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.infoRow}>
+                  <Clock size={18} color={colors.textMuted} />
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoLabel}>Scheduled At</Text>
+                    <Text style={styles.infoValue}>{formatDate(data.preferred_datetime)}</Text>
                   </View>
                 </View>
 
@@ -620,4 +645,3 @@ function Bullet({ children }) {
     </View>
   );
 }
-

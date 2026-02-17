@@ -7,7 +7,7 @@ import { Linking } from 'react-native';
  * @param {string} officePhone - Phone number with possible formatting
  * @returns {string|null} - WhatsApp URL or null if invalid
  */
-export const getWhatsAppUrl = (officePhone) => {
+export const getWhatsAppUrl = (officePhone, message) => {
   if (!officePhone) {
     return null;
   }
@@ -20,7 +20,12 @@ export const getWhatsAppUrl = (officePhone) => {
     return null;
   }
   
-  return `https://wa.me/${phoneNumber}`;
+  if (message && typeof message === 'string') {
+    const encodedMessage = encodeURIComponent(message);
+    return `https://api.whatsapp.com/send/?phone=${phoneNumber}&text=${encodedMessage}&type=phone_number&app_absent=0&wame_ctl=1`;
+  }
+
+  return `https://api.whatsapp.com/send/?phone=${phoneNumber}&type=phone_number&app_absent=0&wame_ctl=1`;
 };
 
 /**
@@ -33,8 +38,8 @@ export const getWhatsAppUrl = (officePhone) => {
  * @param {string} officePhone - Phone number with possible formatting
  * @returns {Promise<void>}
  */
-export const openWhatsApp = async (officePhone) => {
-  const url = getWhatsAppUrl(officePhone);
+export const openWhatsApp = async (officePhone, message) => {
+  const url = getWhatsAppUrl(officePhone, message);
   
   if (!url) {
     throw new Error('Invalid phone number');
@@ -45,6 +50,26 @@ export const openWhatsApp = async (officePhone) => {
     await Linking.openURL(url);
   } catch (error) {
     console.error('Error opening WhatsApp:', error);
+    throw error;
+  }
+};
+
+/**
+ * Share a message via WhatsApp (no phone, opens chooser in WhatsApp)
+ *
+ * @param {string} message - Message to share
+ * @returns {Promise<void>}
+ */
+export const shareWhatsAppMessage = async (message) => {
+  if (!message || typeof message !== 'string') {
+    throw new Error('Message is required');
+  }
+  const encodedMessage = encodeURIComponent(message);
+  const url = `https://wa.me/?text=${encodedMessage}`;
+  try {
+    await Linking.openURL(url);
+  } catch (error) {
+    console.error('Error sharing to WhatsApp:', error);
     throw error;
   }
 };

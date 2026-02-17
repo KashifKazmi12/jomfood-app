@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Image,
   Modal,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback
@@ -162,6 +163,42 @@ export default function ProfileScreen() {
       oldPassword: passwordForm.oldPassword,
       newPassword: passwordForm.newPassword,
     });
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      t('common.deleteAccountConfirmTitle', 'Delete account?'),
+      t('common.deleteAccountConfirmMessage', 'This will permanently delete your account.'),
+      [
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+        {
+          text: t('common.deleteAccountConfirmAction', 'Delete'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await authAPI.deleteAccount();
+              try {
+                await removeCustomerIdFromFCMToken();
+              } catch (error) {
+                console.warn('⚠️ Failed to remove customerId from FCM token:', error);
+              }
+              await authAPI.logout();
+              dispatch(clearUser());
+              showToast.success(
+                t('common.deleteAccountSuccess', 'Account deleted'),
+                t('common.deleteAccountSuccessMessage', 'Your account has been deleted.')
+              );
+              navigation.navigate('Home');
+            } catch (error) {
+              showToast.error(
+                t('common.deleteAccountFailed', 'Delete failed'),
+                error.message || t('common.failedToDeleteAccount', 'Failed to delete account')
+              );
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (!userId) {
@@ -350,6 +387,16 @@ export default function ProfileScreen() {
                   <Text style={styles.actionButtonText}>{t('common.changePassword')}</Text>
                 </TouchableOpacity>
               )}
+
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleDeleteAccount}
+              >
+                <LogOut size={20} color={colors.textMuted} />
+                <Text style={styles.actionButtonText}>
+                  {t('common.deleteAccount', 'Delete Account')}
+                </Text>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.actionButton, styles.logoutButton]}

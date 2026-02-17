@@ -8,6 +8,7 @@ import api from '../api/client';
 import { authStorage } from '../utils/authStorage';
 import { setUser, clearUser, setLoading } from '../store/slices/authSlice';
 import { NotificationProvider } from '../context/NotificationContext';
+import { CartProvider } from '../context/CartContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,8 +33,10 @@ export default function AppProviders({ children }) {
     <ReduxProvider store={store}>
       <QueryClientProvider client={queryClient}>
         <NotificationProvider>
-          <AuthBootstrap />
-          {children}
+          <CartProvider>
+            <AuthBootstrap />
+            {children}
+          </CartProvider>
         </NotificationProvider>
       </QueryClientProvider>
     </ReduxProvider>

@@ -24,6 +24,7 @@ export default function LoginPrompt({
   message,
   icon: Icon = User,
   iconSize = 48,
+  onLogin,
 }) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -39,7 +40,13 @@ export default function LoginPrompt({
       <Text style={styles.message}>{defaultMessage}</Text>
       <TouchableOpacity 
         style={styles.loginButton}
-        onPress={() => navigation.navigate('Login')}
+        onPress={() => {
+          if (onLogin) {
+            onLogin();
+            return;
+          }
+          navigation.navigate('Login');
+        }}
       >
         <Text style={styles.loginButtonText}>{t('common.login')}</Text>
       </TouchableOpacity>

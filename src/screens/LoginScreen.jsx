@@ -49,7 +49,7 @@ export default function LoginScreen() {
   const colors = useThemeColors();
   const typography = useThemeTypography();
   const styles = getStyles(colors, typography);
-  
+
   // Get return navigation params if coming from DealDetail
   const returnTo = route.params?.returnTo;
   const returnParams = route.params?.returnParams;
@@ -59,7 +59,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   const [isSubmittingGoogle, setIsSubmittingGoogle] = useState(false);
-  
+
   // Phone prompt state
   const [showPhonePrompt, setShowPhonePrompt] = useState(false);
   const [phoneInput, setPhoneInput] = useState('');
@@ -72,7 +72,18 @@ export default function LoginScreen() {
    */
   const navigateAfterLogin = () => {
     if (returnTo === 'DealDetail' && returnParams) {
+      navigation.replace('RootTabs', {
+        screen: 'Home',
+        params: {
+          screen: 'DealDetail',
+          params: returnParams,
+        },
+      });
+      return;
+    }
+    if (returnTo && returnTo !== 'DealDetail') {
       navigation.replace(returnTo, returnParams);
+      return;
     } else {
       navigation.replace('RootTabs');
     }
@@ -169,7 +180,21 @@ export default function LoginScreen() {
       }
     } catch (error) {
       dispatch(setLoading(false));
-      
+
+      // Handle Email Not Verified
+      if (error.error === 'EMAIL_NOT_VERIFIED' || error.message?.includes('verify')) {
+        const userId = error.data?.data?.userId || error.data?.userId;
+
+        if (userId) {
+          showToast.error(t('common.loginFailed'), "Please verify your email first.");
+          navigation.navigate('Verification', {
+            userId: userId,
+            email: email.trim()
+          });
+          return;
+        }
+      }
+
       // Show error message
       const errorMessage = error.message || t('common.loginFailedMessage');
       showToast.error(t('common.loginFailed'), errorMessage);
@@ -239,7 +264,7 @@ export default function LoginScreen() {
       }
     } catch (error) {
       dispatch(setLoading(false));
-      
+
       // Don't show error if user cancelled
       if (error.cancelled) {
         return;
@@ -256,7 +281,7 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-      style={[styles.container, { backgroundColor: colors.background, flex: 1 }]}
+      style={[styles.container, { flex: 1 }]}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       enabled
     >
@@ -266,169 +291,169 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-          {/* Logo/Title Section */
-          }
-          <View style={styles.header}>
-            <Logo size={122} height={35.5} style={styles.logo} />
-            {/* <Text style={[styles.welcomeText, { color: colors.text, fontFamily: typography.fontFamily.semiBold }]}>{t('login.welcomeBack')}</Text> */}
-            <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('login.loginToAccount')}</Text>
+        {/* Logo/Title Section */
+        }
+        <View style={styles.header}>
+          <Logo size={122} height={35.5} style={styles.logo} />
+          {/* <Text style={[styles.welcomeText, { color: colors.text, fontFamily: typography.fontFamily.semiBold }]}>{t('login.welcomeBack')}</Text> */}
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('login.loginToAccount')}</Text>
+        </View>
+
+        {/* Login Form */}
+        <View style={styles.form}>
+          {/* Email Input */}
+          <View style={styles.inputContainer}>
+            <Text style={[styles.label, { color: colors.text }]}>{t('login.email')}</Text>
+            <TextInput
+              style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.white }]}
+              placeholder={t('login.emailPlaceholder')}
+              placeholderTextColor={colors.textMuted}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              editable={!isSubmittingForm && !isSubmittingGoogle}
+            />
           </View>
 
-          {/* Login Form */}
-          <View style={styles.form}>
-            {/* Email Input */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text }]}>{t('login.email')}</Text>
-              <TextInput
-                style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.white }]}
-                placeholder={t('login.emailPlaceholder')}
-                placeholderTextColor={colors.textMuted}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="next"
-                blurOnSubmit={false}
-                editable={!isSubmittingForm && !isSubmittingGoogle}
-              />
-            </View>
+          {/* Password Input */}
+          <View style={styles.inputContainer}>
+            <Text style={[styles.label, { color: colors.text }]}>{t('login.password')}</Text>
+            <TextInput
+              style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.white }]}
+              placeholder={t('login.passwordPlaceholder')}
+              placeholderTextColor={colors.textMuted}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={handleSubmit}
+              editable={!isSubmittingForm && !isSubmittingGoogle}
+            />
+          </View>
 
-            {/* Password Input */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.text }]}>{t('login.password')}</Text>
-              <TextInput
-                style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.white }]}
-                placeholder={t('login.passwordPlaceholder')}
-                placeholderTextColor={colors.textMuted}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={handleSubmit}
-                editable={!isSubmittingForm && !isSubmittingGoogle}
-              />
-            </View>
+          {/* Login Button */}
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: colors.primary }, isSubmittingForm && styles.buttonDisabled]}
+            onPress={handleSubmit}
+            disabled={isSubmittingForm || isSubmittingGoogle}
+          >
+            {isSubmittingForm ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={styles.buttonText}>{t('common.login')}</Text>
+            )}
+          </TouchableOpacity>
 
-            {/* Login Button */}
+          {/* Divider */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={[styles.dividerText, { color: colors.textMuted }]}>{t('common.orContinueWith')}</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Google Sign In Button */}
+          {Platform.OS === 'android' && (
             <TouchableOpacity
-              style={[styles.button, { backgroundColor: colors.primary }, isSubmittingForm && styles.buttonDisabled]}
-              onPress={handleSubmit}
+              style={[styles.googleButton, isSubmittingGoogle && styles.buttonDisabled]}
+              onPress={handleGoogleSignIn}
               disabled={isSubmittingForm || isSubmittingGoogle}
             >
-              {isSubmittingForm ? (
+              {isSubmittingGoogle ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
-                <Text style={styles.buttonText}>{t('common.login')}</Text>
+                <View style={styles.googleButtonContent}>
+                  <View style={styles.googleIconContainer}>
+                    <GoogleIconSVG />
+                  </View>
+                  <View style={styles.googleButtonTextContainer}>
+                    <Text style={styles.googleButtonText}>{t('common.continueWithGoogle')}</Text>
+                  </View>
+                </View>
               )}
             </TouchableOpacity>
+          )}
 
-            {/* Divider */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={[styles.dividerText, { color: colors.textMuted }]}>{t('common.orContinueWith')}</Text>
-              <View style={styles.dividerLine} />
-            </View>
+          {/* Signup Link */}
+          <View style={styles.signupContainer}>
+            <Text style={[styles.signupText, { color: colors.textMuted }]}>
+              {t('common.dontHaveAccount')}{' '}
+              <Text style={[styles.signupLink, { color: colors.primary }]} onPress={navigateToSignup}>
+                {t('common.signUp')}
+              </Text>
+            </Text>
+          </View>
 
-            {/* Google Sign In Button */}
-            {Platform.OS === 'android' && (
+          {/* Privacy Policy Link */}
+          <View style={styles.privacyContainer}>
+            <Text
+              style={[styles.privacyLink, { color: colors.textMuted }]}
+              onPress={() => navigation.navigate('PrivacyPolicy')}
+            >
+              {t('privacyPolicy.privacyPolicyLink')}
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Phone Required Modal - shows after login if no phone number */}
+      <Modal
+        visible={showPhonePrompt}
+        transparent
+        animationType="fade"
+        onRequestClose={handleSkipPhone}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.phoneModalContainer}
+        >
+          <View style={styles.phoneModalBackdrop} />
+          <View style={styles.phoneModalCard}>
+            <Text style={styles.phoneModalTitle}>{t('common.addPhoneTitle')}</Text>
+            <Text style={styles.phoneModalSubtitle}>{t('common.addPhoneSubtitle')}</Text>
+
+            <TextInput
+              style={styles.phoneInput}
+              placeholder={t('common.enterYourPhoneNumber')}
+              placeholderTextColor={colors.textMuted}
+              value={phoneInput}
+              onChangeText={(value) => {
+                setPhoneInput(value);
+                setPhoneError('');
+              }}
+              keyboardType="phone-pad"
+            />
+            {phoneError ? <Text style={styles.phoneError}>{phoneError}</Text> : null}
+
+            <View style={styles.phoneActions}>
               <TouchableOpacity
-                style={[styles.googleButton, isSubmittingGoogle && styles.buttonDisabled]}
-                onPress={handleGoogleSignIn}
-                disabled={isSubmittingForm || isSubmittingGoogle}
+                style={[styles.phoneButton, styles.phoneLaterButton]}
+                onPress={handleSkipPhone}
+                disabled={phoneSaving}
               >
-                {isSubmittingGoogle ? (
-                  <ActivityIndicator color={colors.white} />
+                <Text style={styles.phoneLaterText}>{t('common.doItLater')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.phoneButton, styles.phoneSaveButton]}
+                onPress={handlePhoneSave}
+                disabled={phoneSaving}
+              >
+                {phoneSaving ? (
+                  <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <View style={styles.googleButtonContent}>
-                    <View style={styles.googleIconContainer}>
-                      <GoogleIconSVG />
-                    </View>
-                    <View style={styles.googleButtonTextContainer}>
-                      <Text style={styles.googleButtonText}>{t('common.continueWithGoogle')}</Text>
-                    </View>
-                  </View>
+                  <Text style={styles.phoneSaveText}>{t('common.save')}</Text>
                 )}
               </TouchableOpacity>
-            )}
-
-            {/* Signup Link */}
-            <View style={styles.signupContainer}>
-              <Text style={[styles.signupText, { color: colors.textMuted }]}>
-                {t('common.dontHaveAccount')}{' '}
-                <Text style={[styles.signupLink, { color: colors.primary }]} onPress={navigateToSignup}>
-                  {t('common.signUp')}
-                </Text>
-              </Text>
-            </View>
-
-            {/* Privacy Policy Link */}
-            <View style={styles.privacyContainer}>
-              <Text
-                style={[styles.privacyLink, { color: colors.textMuted }]}
-                onPress={() => navigation.navigate('PrivacyPolicy')}
-              >
-                {t('privacyPolicy.privacyPolicyLink')}
-              </Text>
             </View>
           </View>
-        </ScrollView>
-
-        {/* Phone Required Modal - shows after login if no phone number */}
-        <Modal
-          visible={showPhonePrompt}
-          transparent
-          animationType="fade"
-          onRequestClose={handleSkipPhone}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.phoneModalContainer}
-          >
-            <View style={styles.phoneModalBackdrop} />
-            <View style={styles.phoneModalCard}>
-              <Text style={styles.phoneModalTitle}>{t('common.addPhoneTitle')}</Text>
-              <Text style={styles.phoneModalSubtitle}>{t('common.addPhoneSubtitle')}</Text>
-
-              <TextInput
-                style={styles.phoneInput}
-                placeholder={t('common.enterYourPhoneNumber')}
-                placeholderTextColor={colors.textMuted}
-                value={phoneInput}
-                onChangeText={(value) => {
-                  setPhoneInput(value);
-                  setPhoneError('');
-                }}
-                keyboardType="phone-pad"
-              />
-              {phoneError ? <Text style={styles.phoneError}>{phoneError}</Text> : null}
-
-              <View style={styles.phoneActions}>
-                <TouchableOpacity
-                  style={[styles.phoneButton, styles.phoneLaterButton]}
-                  onPress={handleSkipPhone}
-                  disabled={phoneSaving}
-                >
-                  <Text style={styles.phoneLaterText}>{t('common.doItLater')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.phoneButton, styles.phoneSaveButton]}
-                  onPress={handlePhoneSave}
-                  disabled={phoneSaving}
-                >
-                  {phoneSaving ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text style={styles.phoneSaveText}>{t('common.save')}</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </Modal>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -471,7 +496,7 @@ const getStyles = (colors, typography) => StyleSheet.create({
   },
   logo: {
     color: colors.primary,
-    marginBottom: 4, 
+    marginBottom: 4,
   },
   welcomeText: {
     color: colors.text,
@@ -606,7 +631,7 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontFamily: typography.fontFamily.regular,
     textDecorationLine: 'underline',
   },
-  
+
   // Phone Modal Styles
   phoneModalContainer: {
     flex: 1,

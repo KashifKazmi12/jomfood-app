@@ -1,7 +1,7 @@
 @echo off
 setlocal
 set EMULATOR_PATH=%LOCALAPPDATA%\Android\Sdk\emulator
-set AVD_NAME=Pixel_6
+set AVD_NAME=Pixel_7
 
 echo ========================================
 echo   Starting Android Emulator: %AVD_NAME%

@@ -57,7 +57,7 @@ export default function SignupScreen() {
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   const [isSubmittingGoogle, setIsSubmittingGoogle] = useState(false);
   const [agreedToPrivacyPolicy, setAgreedToPrivacyPolicy] = useState(false);
-  
+
   // Phone prompt state (for Google sign-in users)
   const [showPhonePrompt, setShowPhonePrompt] = useState(false);
   const [phoneInput, setPhoneInput] = useState('');
@@ -101,6 +101,7 @@ export default function SignupScreen() {
 
     try {
       // Call signup API
+      // Call signup API
       const response = await authAPI.signup({
         name: form.name.trim(),
         email: form.email.trim(),
@@ -108,15 +109,31 @@ export default function SignupScreen() {
         phone: form.phone.trim(),
       });
 
+      // CHECK FOR VERIFICATION REQUIREMENT
+      if (response && response.data && response.data.verificationRequired) {
+        dispatch(setLoading(false));
+        const userId = response.data.userId || response.userId;
+        const message = response.message || "Please verify your email.";
+
+        showToast.success(t('common.accountCreated'), message);
+
+        // Navigate to Verification Screen
+        navigation.replace('Verification', {
+          userId: userId,
+          email: form.email.trim()
+        });
+        return;
+      }
+
       // Show success message
       const userName = response.user?.name || 'Account';
       const userEmail = response.user?.email ? ` (${response.user.email})` : '';
-      
+
       showToast.success(t('common.accountCreated'), t('common.welcomeMessage', { name: userName + userEmail }));
       navigation.replace('Login');
     } catch (error) {
       dispatch(setLoading(false));
-      
+
       // Show error message
       const errorMessage = error.message || t('common.registrationFailedMessage');
       showToast.error(t('common.registrationFailed'), errorMessage);
@@ -227,7 +244,7 @@ export default function SignupScreen() {
       }
     } catch (error) {
       dispatch(setLoading(false));
-      
+
       // Don't show error if user cancelled
       if (error.cancelled) {
         return;
@@ -244,7 +261,7 @@ export default function SignupScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-      style={[styles.container, { backgroundColor: colors.background, flex: 1 }]}
+      style={[styles.container, { flex: 1 }]}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       enabled
     >
@@ -254,220 +271,220 @@ export default function SignupScreen() {
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-          {/* Logo/Title Section */
-          }
-          <View style={styles.header}>
-            <Logo size={122} height={35.5} style={styles.logo} />
-            <Text style={styles.welcomeText}>{t('signup.createYourAccount')}</Text>
-            <Text style={styles.subtitle}>
-              {t('signup.joinJomFood')}
-            </Text>
+        {/* Logo/Title Section */
+        }
+        <View style={styles.header}>
+          <Logo size={122} height={35.5} style={styles.logo} />
+          <Text style={styles.welcomeText}>{t('signup.createYourAccount')}</Text>
+          <Text style={styles.subtitle}>
+            {t('signup.joinJomFood')}
+          </Text>
+        </View>
+
+        {/* Signup Form */}
+        <View style={styles.form}>
+          {/* Name Input */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>{t('signup.fullName')}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={t('signup.namePlaceholder')}
+              placeholderTextColor={colors.textMuted}
+              value={form.name}
+              onChangeText={(value) => handleChange('name', value)}
+              autoCapitalize="words"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              editable={!isSubmittingForm && !isSubmittingGoogle}
+            />
           </View>
 
-          {/* Signup Form */}
-          <View style={styles.form}>
-            {/* Name Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>{t('signup.fullName')}</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t('signup.namePlaceholder')}
-                placeholderTextColor={colors.textMuted}
-                value={form.name}
-                onChangeText={(value) => handleChange('name', value)}
-                autoCapitalize="words"
-                returnKeyType="next"
-                blurOnSubmit={false}
-                editable={!isSubmittingForm && !isSubmittingGoogle}
-              />
-            </View>
+          {/* Email Input */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>{t('signup.email')}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={t('signup.emailPlaceholder')}
+              placeholderTextColor={colors.textMuted}
+              value={form.email}
+              onChangeText={(value) => handleChange('email', value)}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              editable={!isSubmittingForm && !isSubmittingGoogle}
+            />
+          </View>
 
-            {/* Email Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>{t('signup.email')}</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t('signup.emailPlaceholder')}
-                placeholderTextColor={colors.textMuted}
-                value={form.email}
-                onChangeText={(value) => handleChange('email', value)}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="next"
-                blurOnSubmit={false}
-                editable={!isSubmittingForm && !isSubmittingGoogle}
-              />
-            </View>
+          {/* Password Input */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>{t('signup.password')}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={t('signup.passwordPlaceholder')}
+              placeholderTextColor={colors.textMuted}
+              value={form.password}
+              onChangeText={(value) => handleChange('password', value)}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              editable={!isSubmittingForm && !isSubmittingGoogle}
+            />
+          </View>
 
-            {/* Password Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>{t('signup.password')}</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t('signup.passwordPlaceholder')}
-                placeholderTextColor={colors.textMuted}
-                value={form.password}
-                onChangeText={(value) => handleChange('password', value)}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="next"
-                blurOnSubmit={false}
-                editable={!isSubmittingForm && !isSubmittingGoogle}
-              />
-            </View>
+          {/* Phone Input (Optional) */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>{t('signup.phone')}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={t('signup.phonePlaceholder')}
+              placeholderTextColor={colors.textMuted}
+              value={form.phone}
+              onChangeText={(value) => handleChange('phone', value)}
+              keyboardType="phone-pad"
+              returnKeyType="done"
+              onSubmitEditing={handleSubmit}
+              editable={!isSubmittingForm && !isSubmittingGoogle}
+            />
+          </View>
 
-            {/* Phone Input (Optional) */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>{t('signup.phone')}</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t('signup.phonePlaceholder')}
-                placeholderTextColor={colors.textMuted}
-                value={form.phone}
-                onChangeText={(value) => handleChange('phone', value)}
-                keyboardType="phone-pad"
-                returnKeyType="done"
-                onSubmitEditing={handleSubmit}
-                editable={!isSubmittingForm && !isSubmittingGoogle}
-              />
+          {/* Privacy Policy Checkbox */}
+          <TouchableOpacity
+            style={styles.checkboxContainer}
+            onPress={() => setAgreedToPrivacyPolicy(!agreedToPrivacyPolicy)}
+            disabled={isSubmittingForm || isSubmittingGoogle}
+            activeOpacity={0.7}
+          >
+            <View style={[
+              styles.checkbox,
+              agreedToPrivacyPolicy && styles.checkboxChecked,
+              { borderColor: agreedToPrivacyPolicy ? colors.primary : colors.textMuted }
+            ]}>
+              {agreedToPrivacyPolicy && (
+                <Text style={[styles.checkmark, { color: colors.primary }]}>✓</Text>
+              )}
             </View>
-
-            {/* Privacy Policy Checkbox */}
-            <TouchableOpacity
-              style={styles.checkboxContainer}
-              onPress={() => setAgreedToPrivacyPolicy(!agreedToPrivacyPolicy)}
-              disabled={isSubmittingForm || isSubmittingGoogle}
-              activeOpacity={0.7}
-            >
-              <View style={[
-                styles.checkbox,
-                agreedToPrivacyPolicy && styles.checkboxChecked,
-                { borderColor: agreedToPrivacyPolicy ? colors.primary : colors.textMuted }
-              ]}>
-                {agreedToPrivacyPolicy && (
-                  <Text style={[styles.checkmark, { color: colors.primary }]}>✓</Text>
-                )}
-              </View>
-              <Text style={[styles.checkboxLabel, { color: colors.text }]}>
-                {t('privacyPolicy.agreeToPrivacyPolicy')}{' '}
-                <Text
-                  style={[styles.privacyPolicyLink, { color: colors.primary }]}
-                  onPress={navigateToPrivacyPolicy}
-                >
-                  {t('privacyPolicy.privacyPolicyLink')}
-                </Text>
+            <Text style={[styles.checkboxLabel, { color: colors.text }]}>
+              {t('privacyPolicy.agreeToPrivacyPolicy')}{' '}
+              <Text
+                style={[styles.privacyPolicyLink, { color: colors.primary }]}
+                onPress={navigateToPrivacyPolicy}
+              >
+                {t('privacyPolicy.privacyPolicyLink')}
               </Text>
-            </TouchableOpacity>
+            </Text>
+          </TouchableOpacity>
 
-            {/* Signup Button */}
+          {/* Signup Button */}
+          <TouchableOpacity
+            style={[styles.button, isSubmittingForm && styles.buttonDisabled]}
+            onPress={handleSubmit}
+            disabled={isSubmittingForm || isSubmittingGoogle}
+          >
+            {isSubmittingForm ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={styles.buttonText}>{t('common.createAccount')}</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Divider */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>{t('common.orContinueWith')}</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Google Sign In Button */}
+          {Platform.OS === 'android' && (
             <TouchableOpacity
-              style={[styles.button, isSubmittingForm && styles.buttonDisabled]}
-              onPress={handleSubmit}
+              style={[styles.googleButton, isSubmittingGoogle && styles.buttonDisabled]}
+              onPress={handleGoogleSignIn}
               disabled={isSubmittingForm || isSubmittingGoogle}
             >
-              {isSubmittingForm ? (
+              {isSubmittingGoogle ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
-                <Text style={styles.buttonText}>{t('common.createAccount')}</Text>
+                <View style={styles.googleButtonContent}>
+                  <View style={styles.googleIconContainer}>
+                    <GoogleIconSVG />
+                  </View>
+                  <View style={styles.googleButtonTextContainer}>
+                    <Text style={styles.googleButtonText}>{t('common.continueWithGoogle')}</Text>
+                  </View>
+                </View>
               )}
             </TouchableOpacity>
+          )}
 
-            {/* Divider */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>{t('common.orContinueWith')}</Text>
-              <View style={styles.dividerLine} />
-            </View>
+          {/* Login Link */}
+          <View style={styles.loginContainer}>
+            <Text style={styles.loginText}>
+              {t('common.alreadyHaveAccount')}{' '}
+              <Text style={styles.loginLink} onPress={navigateToLogin}>
+                {t('common.signIn')}
+              </Text>
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
 
-            {/* Google Sign In Button */}
-            {Platform.OS === 'android' && (
+      {/* Phone Required Modal - shows after Google sign-in if no phone number */}
+      <Modal
+        visible={showPhonePrompt}
+        transparent
+        animationType="fade"
+        onRequestClose={handleSkipPhone}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.phoneModalContainer}
+        >
+          <View style={styles.phoneModalBackdrop} />
+          <View style={styles.phoneModalCard}>
+            <Text style={styles.phoneModalTitle}>{t('common.addPhoneTitle')}</Text>
+            <Text style={styles.phoneModalSubtitle}>{t('common.addPhoneSubtitle')}</Text>
+
+            <TextInput
+              style={styles.phoneInputModal}
+              placeholder={t('common.enterYourPhoneNumber')}
+              placeholderTextColor={colors.textMuted}
+              value={phoneInput}
+              onChangeText={(value) => {
+                setPhoneInput(value);
+                setPhoneError('');
+              }}
+              keyboardType="phone-pad"
+            />
+            {phoneError ? <Text style={styles.phoneError}>{phoneError}</Text> : null}
+
+            <View style={styles.phoneActions}>
               <TouchableOpacity
-                style={[styles.googleButton, isSubmittingGoogle && styles.buttonDisabled]}
-                onPress={handleGoogleSignIn}
-                disabled={isSubmittingForm || isSubmittingGoogle}
+                style={[styles.phoneButton, styles.phoneLaterButton]}
+                onPress={handleSkipPhone}
+                disabled={phoneSaving}
               >
-                {isSubmittingGoogle ? (
-                  <ActivityIndicator color={colors.white} />
+                <Text style={styles.phoneLaterText}>{t('common.doItLater')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.phoneButton, styles.phoneSaveButton]}
+                onPress={handlePhoneSave}
+                disabled={phoneSaving}
+              >
+                {phoneSaving ? (
+                  <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <View style={styles.googleButtonContent}>
-                    <View style={styles.googleIconContainer}>
-                      <GoogleIconSVG />
-                    </View>
-                    <View style={styles.googleButtonTextContainer}>
-                      <Text style={styles.googleButtonText}>{t('common.continueWithGoogle')}</Text>
-                    </View>
-                  </View>
+                  <Text style={styles.phoneSaveText}>{t('common.save')}</Text>
                 )}
               </TouchableOpacity>
-            )}
-
-            {/* Login Link */}
-            <View style={styles.loginContainer}>
-              <Text style={styles.loginText}>
-                {t('common.alreadyHaveAccount')}{' '}
-                <Text style={styles.loginLink} onPress={navigateToLogin}>
-                  {t('common.signIn')}
-                </Text>
-              </Text>
             </View>
           </View>
-        </ScrollView>
-
-        {/* Phone Required Modal - shows after Google sign-in if no phone number */}
-        <Modal
-          visible={showPhonePrompt}
-          transparent
-          animationType="fade"
-          onRequestClose={handleSkipPhone}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.phoneModalContainer}
-          >
-            <View style={styles.phoneModalBackdrop} />
-            <View style={styles.phoneModalCard}>
-              <Text style={styles.phoneModalTitle}>{t('common.addPhoneTitle')}</Text>
-              <Text style={styles.phoneModalSubtitle}>{t('common.addPhoneSubtitle')}</Text>
-
-              <TextInput
-                style={styles.phoneInputModal}
-                placeholder={t('common.enterYourPhoneNumber')}
-                placeholderTextColor={colors.textMuted}
-                value={phoneInput}
-                onChangeText={(value) => {
-                  setPhoneInput(value);
-                  setPhoneError('');
-                }}
-                keyboardType="phone-pad"
-              />
-              {phoneError ? <Text style={styles.phoneError}>{phoneError}</Text> : null}
-
-              <View style={styles.phoneActions}>
-                <TouchableOpacity
-                  style={[styles.phoneButton, styles.phoneLaterButton]}
-                  onPress={handleSkipPhone}
-                  disabled={phoneSaving}
-                >
-                  <Text style={styles.phoneLaterText}>{t('common.doItLater')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.phoneButton, styles.phoneSaveButton]}
-                  onPress={handlePhoneSave}
-                  disabled={phoneSaving}
-                >
-                  {phoneSaving ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text style={styles.phoneSaveText}>{t('common.save')}</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </Modal>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -676,7 +693,7 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontFamily: typography.fontFamily.semiBold,
     textDecorationLine: 'underline',
   },
-  
+
   // Phone Modal Styles
   phoneModalContainer: {
     flex: 1,

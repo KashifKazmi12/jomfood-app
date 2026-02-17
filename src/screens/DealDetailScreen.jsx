@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, Image, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, Modal, Platform, KeyboardAvoidingView, TouchableWithoutFeedback, Linking } from 'react-native';
+import { Alert, View, Text, TextInput, StyleSheet, Image, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, Modal, Platform, KeyboardAvoidingView, TouchableWithoutFeedback, Linking } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import useThemeColors from '../theme/useThemeColors';
 import useThemeTypography from '../theme/useThemeTypography';
 import { dealsAPI } from '../api/deals';
@@ -12,11 +13,13 @@ import authAPI from '../api/auth';
 import { updateUser } from '../store/slices/authSlice';
 import { showToast } from '../components/toast';
 import ClaimedDealModal from '../components/deals/ClaimedDealModal';
-import { Star, Heart, ChevronLeft, ChevronRight, X, MapPin, Truck, UtensilsCrossed, ShoppingBag } from 'lucide-react-native';
+import { Star, Heart, ChevronLeft, ChevronRight, X, MapPin, Truck, UtensilsCrossed, ShoppingBag, Share2 } from 'lucide-react-native';
 import { formatCurrency } from '../utils/formatCurrency';
 import { openWhatsApp } from '../utils/whatsapp';
 import Svg, { Path } from 'react-native-svg';
 import { BottomNavigationSpace } from '../navigation/AppNavigator';
+import { useCart } from '../context/CartContext';
+import ShareDealModal from '../components/deals/ShareDealModal';
 
 // if (fullDeal.max_quantity === 1) {
 //   return 'One-time use only';
@@ -36,6 +39,7 @@ export default function DealDetailScreen() {
   const { t } = useTranslation();
   const user = useSelector(state => state.auth.user);
   const queryClient = useQueryClient();
+  const { addItem, clearCart } = useCart();
   const { id } = (route?.params || {});
 
   // Phone prompt states
@@ -70,6 +74,49 @@ export default function DealDetailScreen() {
   const maxQuantity = deal?.max_quantity ?? null;
   const maxQuantityText = maxQuantity === 1 ? 'One-time use only' : maxQuantity === 2 ? 'Can be used twice' : `Can be used up to ${maxQuantity} times`;
   const rating = Number(deal?.rating ?? 5);
+  const dealLink = id ? `https://jomfood.my/?dealId=${id}&autoOpen=true` : 'https://jomfood.my';
+  const shareMessage = `Hey! Check out this awesome deal I found for ${name} at ${company}! Check it out here: ${dealLink} Let's go together!`;
+console.log('Company is:', company)
+
+  const handleAddToCart = async () => {
+    try {
+      setIsClaiming(true);
+      const result = await addItem(deal);
+      if (result?.ok) {
+        showToast.success(t('cart.added', 'Added to cart'), t('cart.openHint', 'Open your cart to checkout.'));
+        return;
+      }
+      if (result?.reason === 'not_logged_in') {
+        setLoginModalVisible(true);
+        return;
+      }
+      if (result?.reason === 'different_restaurant') {
+        Alert.alert(
+          t('cart.replaceTitle', 'Replace cart items?'),
+          t(
+            'cart.replaceMessage',
+            'Your cart can only include deals from one restaurant. Clear current cart and add this deal?'
+          ),
+          [
+            { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+            {
+              text: t('cart.replaceConfirm', 'Clear & Add'),
+              style: 'destructive',
+              onPress: async () => {
+                await clearCart();
+                const retry = await addItem(deal);
+                if (retry?.ok) {
+                  showToast.success(t('cart.added', 'Added to cart'), t('cart.openHint', 'Open your cart to checkout.'));
+                }
+              },
+            },
+          ]
+        );
+      }
+    } finally {
+      setIsClaiming(false);
+    }
+  };
 
   // Calculate discount text based on deal_type (matching web implementation)
   const discountText = React.useMemo(() => {
@@ -133,6 +180,34 @@ export default function DealDetailScreen() {
   const [claimData, setClaimData] = React.useState(null);
   const [isClaiming, setIsClaiming] = React.useState(false);
   const [loginModalVisible, setLoginModalVisible] = React.useState(false);
+  const [preferencesVisible, setPreferencesVisible] = React.useState(false);
+  const [preferredServiceType, setPreferredServiceType] = React.useState('');
+  const [preferredDateValue, setPreferredDateValue] = React.useState(null);
+  const [preferredTimeValue, setPreferredTimeValue] = React.useState(null);
+  const [preferenceError, setPreferenceError] = React.useState('');
+  const [iosPickerVisible, setIosPickerVisible] = React.useState(false);
+  const [iosPickerMode, setIosPickerMode] = React.useState('date');
+  const [iosPickerValue, setIosPickerValue] = React.useState(new Date());
+  const [shareVisible, setShareVisible] = React.useState(false);
+
+  const consumptionTypes = React.useMemo(() => {
+    const types = deal?.consumptionType || deal?.consumption_type || [];
+    return Array.isArray(types) ? types : [];
+  }, [deal?.consumptionType, deal?.consumption_type]);
+
+  const serviceTypeOptions = React.useMemo(() => {
+    const normalizeType = (type) => {
+      if (!type || typeof type !== 'string') return '';
+      const normalized = type.trim().toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+      if (normalized === 'dine_in' || normalized === 'dinein') return 'dine_in';
+      if (normalized === 'self_pickup' || normalized === 'pickup') return 'self_pickup';
+      if (normalized === 'delivery') return 'delivery';
+      return normalized;
+    };
+    const normalized = consumptionTypes.map(normalizeType).filter(Boolean);
+    const unique = Array.from(new Set(normalized));
+    return unique.length > 0 ? unique : ['dine_in', 'delivery', 'self_pickup'];
+  }, [consumptionTypes]);
 
   // Check favorite status on mount and when user changes
   React.useEffect(() => {
@@ -281,7 +356,9 @@ export default function DealDetailScreen() {
 
     try {
       // Same implementation as Web - uses https://wa.me/ URL
-      await openWhatsApp(officePhone);
+      const dealLink = id ? `https://jomfood.my/?dealId=${id}&autoOpen=true` : 'https://jomfood.my';
+      const message = `Hi, I am interested in the deal ${name}.\nLink: ${dealLink}`;
+      await openWhatsApp(officePhone, message);
     } catch (error) {
       console.error('WhatsApp open error:', error);
       showToast.error('Error', 'Could not open WhatsApp');
@@ -341,8 +418,8 @@ export default function DealDetailScreen() {
       // If we were trying to claim, continue with the claim
       if (pendingClaim) {
         setPendingClaim(false);
-        // Proceed with claim after phone is saved
-        performClaim();
+        // Proceed with preferences after phone is saved
+        openPreferencesModal();
       }
     } catch (error) {
       showToast.error(t('common.updateFailed'), error.message || t('common.failedToUpdateProfile'));
@@ -351,11 +428,78 @@ export default function DealDetailScreen() {
     }
   };
 
+  const openPreferencesModal = () => {
+    setPreferredServiceType('');
+    setPreferredDateValue(null);
+    setPreferredTimeValue(null);
+    setPreferenceError('');
+    setPreferencesVisible(true);
+  };
+
+  const buildPreferredDatetime = () => {
+    if (!preferredDateValue || !preferredTimeValue) return null;
+    const combined = new Date(
+      preferredDateValue.getFullYear(),
+      preferredDateValue.getMonth(),
+      preferredDateValue.getDate(),
+      preferredTimeValue.getHours(),
+      preferredTimeValue.getMinutes(),
+      0,
+      0
+    );
+    return combined.toISOString();
+  };
+
+  const formatDateDisplay = (dateValue) => {
+    if (!dateValue) return '';
+    return dateValue.toLocaleDateString('en-US');
+  };
+
+  const formatTimeDisplay = (timeValue) => {
+    if (!timeValue) return '';
+    return timeValue.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  };
+
+  const openDateTimePicker = (mode) => {
+    if (Platform.OS === 'android') {
+      const currentValue = mode === 'date'
+        ? (preferredDateValue || new Date())
+        : (preferredTimeValue || new Date());
+      DateTimePickerAndroid.open({
+        value: currentValue,
+        mode,
+        is24Hour: false,
+        onChange: (event, selectedDate) => {
+          if (event.type !== 'set' || !selectedDate) return;
+          if (mode === 'date') {
+            setPreferredDateValue(selectedDate);
+          } else {
+            setPreferredTimeValue(selectedDate);
+          }
+          setPreferenceError('');
+        },
+      });
+      return;
+    }
+
+    const currentValue = mode === 'date'
+      ? (preferredDateValue || new Date())
+      : (preferredTimeValue || new Date());
+    setIosPickerMode(mode);
+    setIosPickerValue(currentValue);
+    setIosPickerVisible(true);
+  };
+
   // Actual claim logic
-  const performClaim = async () => {
+  const performClaim = async (preferences = {}) => {
     setIsClaiming(true);
     try {
-      const res = await dealsAPI.claim({ dealId: id, customerId: user._id });
+      const res = await dealsAPI.claim({
+        dealId: id,
+        customerId: user._id,
+        preferredServiceType: preferences.preferredServiceType,
+        preferredDatetime: preferences.preferredDatetime,
+      });
       setClaimData(res);
       setClaimVisible(true);
       showToast.success('Deal claimed', 'QR code is ready');
@@ -386,7 +530,7 @@ export default function DealDetailScreen() {
       return;
     }
 
-    performClaim();
+    openPreferencesModal();
   };
 
   if (isLoading) {
@@ -434,6 +578,12 @@ export default function DealDetailScreen() {
             <View style={styles.saveBadge}>
               <Text style={styles.saveBadgeText}>{discountText}</Text>
             </View>
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={() => setShareVisible(true)}
+            >
+              <Share2 size={22} color={colors.textMuted} />
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.heartButton}
               onPress={handleFavoriteToggle}
@@ -500,39 +650,36 @@ export default function DealDetailScreen() {
           </View>
 
           {/* Consumption Types Section */}
-          {(() => {
-            const consumptionTypes = deal?.consumptionType || deal?.consumption_type || [];
-            return Array.isArray(consumptionTypes) && consumptionTypes.length > 0 && (
-              <View style={styles.consumptionSection}>
-                <View style={styles.consumptionBadges}>
-                  {consumptionTypes.includes('delivery') && (
-                    <View style={[styles.consumptionBadge, styles.deliveryBadge]}>
-                      <Truck size={12} color="#2563EB" />
-                      <Text style={[styles.consumptionBadgeText, styles.deliveryText]}>
-                        {t('common.delivery')}
-                      </Text>
-                    </View>
-                  )}
-                  {consumptionTypes.includes('dine-in') && (
-                    <View style={[styles.consumptionBadge, styles.dineInBadge]}>
-                      <UtensilsCrossed size={12} color="#16A34A" />
-                      <Text style={[styles.consumptionBadgeText, styles.dineInText]}>
-                        {t('common.dineIn')}
-                      </Text>
-                    </View>
-                  )}
-                  {consumptionTypes.includes('self_pickup') && (
-                    <View style={[styles.consumptionBadge, styles.pickupBadge]}>
-                      <ShoppingBag size={12} color="#EA580C" />
-                      <Text style={[styles.consumptionBadgeText, styles.pickupText]}>
-                        {t('common.selfPickup')}
-                      </Text>
-                    </View>
-                  )}
-                </View>
+          {consumptionTypes.length > 0 && (
+            <View style={styles.consumptionSection}>
+              <View style={styles.consumptionBadges}>
+                {consumptionTypes.includes('delivery') && (
+                  <View style={[styles.consumptionBadge, styles.deliveryBadge]}>
+                    <Truck size={12} color="#2563EB" />
+                    <Text style={[styles.consumptionBadgeText, styles.deliveryText]}>
+                      {t('common.delivery')}
+                    </Text>
+                  </View>
+                )}
+                {consumptionTypes.includes('dine-in') && (
+                  <View style={[styles.consumptionBadge, styles.dineInBadge]}>
+                    <UtensilsCrossed size={12} color="#16A34A" />
+                    <Text style={[styles.consumptionBadgeText, styles.dineInText]}>
+                      {t('common.dineIn')}
+                    </Text>
+                  </View>
+                )}
+                {consumptionTypes.includes('self_pickup') && (
+                  <View style={[styles.consumptionBadge, styles.pickupBadge]}>
+                    <ShoppingBag size={12} color="#EA580C" />
+                    <Text style={[styles.consumptionBadgeText, styles.pickupText]}>
+                      {t('common.selfPickup')}
+                    </Text>
+                  </View>
+                )}
               </View>
-            );
-          })()}
+            </View>
+          )}
           {timeRemaining?.expired && (
             <View style={styles.expiredContainer}>
               <Text style={styles.expiredText}>This deal has expired</Text>
@@ -557,6 +704,11 @@ export default function DealDetailScreen() {
                   }}
                 >
                   <Text style={styles.restaurantName}>{company || 'Restaurant'}</Text>
+                  <Text style={styles.restaurantLinkLabel}>
+                    {t('dealDetail.viewMoreFromRestaurant', 'View more from {{restaurant}}', {
+                      restaurant: company || 'Restaurant',
+                    })}
+                  </Text>
                 </TouchableOpacity>
                 {location && (
                   <Text style={styles.restaurantLocation}>{location}</Text>
@@ -680,25 +832,25 @@ export default function DealDetailScreen() {
             </View>
           )}
 
-          {/* Claim Deal Button - Only show if deal is not expired */}
-          {!isDealExpired && !timeRemaining?.expired && (
-            <View style={styles.bottomButtonContainer}>
-              <TouchableOpacity
-                style={[styles.claimButton, isClaiming && styles.claimButtonDisabled]}
-                onPress={claim}
-                disabled={isClaiming}
-              >
-                {isClaiming ? (
-                  <View style={styles.claimButtonLoading}>
-                    <ActivityIndicator size="small" color={colors.white} style={{ marginRight: 8 }} />
-                    <Text style={styles.claimButtonText}>Claiming...</Text>
-                  </View>
-                ) : (
-                  <Text style={styles.claimButtonText}>Claim Deal</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
+            {/* Add to Cart Button - Only show if deal is not expired */}
+            {!isDealExpired && !timeRemaining?.expired && (
+              <View style={styles.bottomButtonContainer}>
+                <TouchableOpacity
+                  style={[styles.claimButton, isClaiming && styles.claimButtonDisabled]}
+                  onPress={handleAddToCart}
+                  disabled={isClaiming}
+                >
+                  {isClaiming ? (
+                    <View style={styles.claimButtonLoading}>
+                      <ActivityIndicator size="small" color={colors.white} style={{ marginRight: 8 }} />
+                      <Text style={styles.claimButtonText}>{t('cart.adding', 'Adding...')}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.claimButtonText}>{t('cart.add', 'Add to Cart')}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
         </View>
       </ScrollView >
 
@@ -706,6 +858,12 @@ export default function DealDetailScreen() {
         visible={claimVisible}
         onClose={() => setClaimVisible(false)}
         data={claimData}
+      />
+      <ShareDealModal
+        visible={shareVisible}
+        onClose={() => setShareVisible(false)}
+        link={dealLink}
+        message={shareMessage}
       />
 
       {/* Login Required Modal */}
@@ -743,6 +901,154 @@ export default function DealDetailScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Preferences Modal */}
+      <Modal
+        visible={preferencesVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setPreferencesVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <TouchableWithoutFeedback onPress={() => setPreferencesVisible(false)}>
+            <View style={styles.modalBackdrop} />
+          </TouchableWithoutFeedback>
+          <View style={styles.preferenceModalCard}>
+            <View style={styles.preferenceHeaderRow}>
+              <Text style={styles.preferenceTitle}>Set Your Preferences</Text>
+              <TouchableOpacity onPress={() => setPreferencesVisible(false)}>
+                <X size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.preferenceSubtitle}>All fields are required</Text>
+
+            <Text style={styles.preferenceSectionLabel}>Preferred Service Type *</Text>
+            <View style={styles.preferenceOptionsRow}>
+              {serviceTypeOptions.map((type) => {
+                const label = type === 'dine_in' ? 'Dine-in' : type === 'self_pickup' ? 'Self pickup' : 'Delivery';
+                const isSelected = preferredServiceType === type;
+                return (
+                  <TouchableOpacity
+                    key={type}
+                    style={[styles.preferenceOption, isSelected && styles.preferenceOptionSelected]}
+                    onPress={() => setPreferredServiceType(isSelected ? '' : type)}
+                  >
+                    <Text style={[styles.preferenceOptionText, isSelected && styles.preferenceOptionTextSelected]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.preferenceSectionLabel}>Preferred Date *</Text>
+            <TouchableOpacity
+              style={styles.preferenceInput}
+              onPress={() => openDateTimePicker('date')}
+            >
+              <Text style={preferredDateValue ? styles.preferenceInputText : styles.preferenceInputPlaceholder}>
+                {preferredDateValue ? formatDateDisplay(preferredDateValue) : 'Select date'}
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={styles.preferenceSectionLabel}>Preferred Time *</Text>
+            <TouchableOpacity
+              style={styles.preferenceInput}
+              onPress={() => openDateTimePicker('time')}
+            >
+              <Text style={preferredTimeValue ? styles.preferenceInputText : styles.preferenceInputPlaceholder}>
+                {preferredTimeValue ? formatTimeDisplay(preferredTimeValue) : 'Select time'}
+              </Text>
+            </TouchableOpacity>
+
+            {preferenceError ? <Text style={styles.preferenceError}>{preferenceError}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.preferencePrimaryButton, isClaiming && styles.preferenceButtonDisabled]}
+              disabled={isClaiming}
+              onPress={() => {
+                if (!preferredServiceType) {
+                  setPreferenceError('Please select a service type.');
+                  return;
+                }
+                if (!preferredDateValue || !preferredTimeValue) {
+                  setPreferenceError('Please select both date and time.');
+                  return;
+                }
+                const preferredDatetime = buildPreferredDatetime();
+                setPreferencesVisible(false);
+                performClaim({
+                  preferredServiceType,
+                  preferredDatetime,
+                });
+              }}
+            >
+              {isClaiming ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Text style={styles.preferencePrimaryText}>Claim Deal</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.preferenceSecondaryButton}
+              onPress={() => setPreferencesVisible(false)}
+              disabled={isClaiming}
+            >
+              <Text style={styles.preferenceSecondaryText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* iOS Date/Time Picker Modal */}
+      <Modal
+        visible={iosPickerVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIosPickerVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setIosPickerVisible(false)}>
+          <View style={styles.modalBackdrop} />
+        </TouchableWithoutFeedback>
+        <View style={styles.iosPickerCard}>
+          <DateTimePicker
+            value={iosPickerValue}
+            mode={iosPickerMode}
+            display="spinner"
+            onChange={(event, selectedDate) => {
+              if (selectedDate) {
+                setIosPickerValue(selectedDate);
+              }
+            }}
+          />
+          <View style={styles.iosPickerActions}>
+            <TouchableOpacity
+              style={styles.preferenceSecondaryButton}
+              onPress={() => setIosPickerVisible(false)}
+            >
+              <Text style={styles.preferenceSecondaryText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.preferencePrimaryButton}
+              onPress={() => {
+                if (iosPickerMode === 'date') {
+                  setPreferredDateValue(iosPickerValue);
+                } else {
+                  setPreferredTimeValue(iosPickerValue);
+                }
+                setPreferenceError('');
+                setIosPickerVisible(false);
+              }}
+            >
+              <Text style={styles.preferencePrimaryText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       {/* Phone Required Modal - shows when claiming without phone number */}
@@ -970,6 +1276,9 @@ const getStyles = (colors, typography) => StyleSheet.create({
   heartButton: {
     padding: 4,
   },
+  shareButton: {
+    padding: 6,
+  },
   description: {
     fontSize: typography.fontSize.base,
     color: colors.textMuted,
@@ -1150,6 +1459,12 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontSize: typography.fontSize.base,
     color: colors.textDark || colors.text,
     fontFamily: typography.fontFamily.semiBold,
+  },
+  restaurantLinkLabel: {
+    fontSize: typography.fontSize.xs,
+    color: colors.primary,
+    fontFamily: typography.fontFamily.medium,
+    marginTop: 2,
   },
   restaurantLocation: {
     fontSize: typography.fontSize.sm,
@@ -1431,7 +1746,7 @@ const getStyles = (colors, typography) => StyleSheet.create({
   loginModalButton: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 8,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1504,7 +1819,7 @@ const getStyles = (colors, typography) => StyleSheet.create({
   phoneButton: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1525,6 +1840,140 @@ const getStyles = (colors, typography) => StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.base,
     fontFamily: typography.fontFamily.semiBold,
+  },
+
+  // Preferences Modal Styles
+  preferenceModalCard: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 20,
+    width: '88%',
+    maxWidth: 420,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  preferenceHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  preferenceTitle: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.semiBold,
+    color: colors.text,
+  },
+  preferenceSubtitle: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textMuted,
+    marginBottom: 16,
+  },
+  preferenceSectionLabel: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.semiBold,
+    color: colors.text,
+    marginBottom: 8,
+  },
+  preferenceOptionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  preferenceOption: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: colors.white,
+  },
+  preferenceOptionSelected: {
+    borderColor: '#27AE60',
+    backgroundColor: '#FE8100',
+  },
+  preferenceOptionText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.text,
+  },
+  preferenceOptionTextSelected: {
+    color: colors.white,
+    fontFamily: typography.fontFamily.semiBold,
+  },
+  preferenceInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: colors.white,
+    marginBottom: 14,
+  },
+  preferenceInputText: {
+    color: colors.text,
+    fontSize: typography.fontSize.base,
+    fontFamily: typography.fontFamily.regular,
+  },
+  preferenceInputPlaceholder: {
+    color: colors.textMuted,
+    fontSize: typography.fontSize.base,
+    fontFamily: typography.fontFamily.regular,
+  },
+  preferenceError: {
+    color: colors.error || '#d32f2f',
+    fontSize: 12,
+    fontFamily: typography.fontFamily.medium,
+    marginBottom: 12,
+  },
+  preferencePrimaryButton: {
+    backgroundColor: '#FE8100',
+    borderRadius: 6,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  preferencePrimaryText: {
+    color: colors.white,
+    fontSize: typography.fontSize.base,
+    fontFamily: typography.fontFamily.semiBold,
+  },
+  preferenceSecondaryButton: {
+    backgroundColor: colors.backgroundLight || '#F5F5F5',
+    borderRadius: 6,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  preferenceSecondaryText: {
+    color: colors.text,
+    fontSize: typography.fontSize.base,
+    fontFamily: typography.fontFamily.semiBold,
+  },
+  preferenceButtonDisabled: {
+    opacity: 0.7,
+  },
+  iosPickerCard: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 20,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  iosPickerActions: {
+    flexDirection: 'row',
+    gap: 12,
   },
 });
 

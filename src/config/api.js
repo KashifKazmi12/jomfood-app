@@ -18,11 +18,13 @@ const API_CONFIG = {
 
   // Production URL (used in release builds)
   // ⚠️ CHANGE THIS TO YOUR LIVE BACKEND URL BEFORE BUILDING RELEASE APK
+  // PROD_BASE_URL: 'https://jscapi.altitudeprojects.net/api', // TODO: Replace with your actual production URL
   PROD_BASE_URL: 'https://jscapi.jomsmart.com/api', // TODO: Replace with your actual production URL
 
   // Automatically use the right URL based on environment
   BASE_URL: isDevelopment
     ? 'http://192.168.100.98:5055/api'  // Development
+    // : 'https://jscapi.altitudeprojects.net/api', // Production - CHANGE THIS!
     : 'https://jscapi.jomsmart.com/api', // Production - CHANGE THIS!
 
   // Timeout for requests (milliseconds)

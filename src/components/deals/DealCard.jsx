@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import useThemeColors from '../../theme/useThemeColors';
+import { Share2 } from 'lucide-react-native';
+import ShareDealModal from './ShareDealModal';
 
 function getDealImage(deal) {
   const firstItem = Array.isArray(deal?.deal_items) && deal.deal_items.length > 0 ? deal.deal_items[0] : null;
@@ -17,9 +19,13 @@ function DealCard({ deal, onView, onQuickClaim }) {
 
   const name = deal?.deal_name || 'Delicious deal';
   const company = deal?.business_id?.company_name || deal?.group_id?.name || 'Restaurant';
+  const area = deal?.business_id?.area || '';
   const original = deal?.original_total ?? null;
   const price = deal?.deal_total ?? null;
   const discountPct = deal?.discount_percentage ?? null;
+  const [shareVisible, setShareVisible] = React.useState(false);
+  const dealLink = deal?._id ? `https://jomfood.my/?dealId=${deal._id}&autoOpen=true` : 'https://jomfood.my';
+  const shareMessage = `Hey! Check out this awesome deal I found for ${name} at ${company}! Check it out here: ${dealLink} Let's go together!`;
 
   return (
     <View style={styles.card}>
@@ -29,6 +35,11 @@ function DealCard({ deal, onView, onQuickClaim }) {
       <View style={styles.info}>
         <Text numberOfLines={1} style={styles.title}>{name}</Text>
         <Text numberOfLines={1} style={styles.subtitle}>{company}</Text>
+        {area ? (
+          <View style={styles.areaRow}>
+            <Text numberOfLines={1} style={styles.areaText}>{area}</Text>
+          </View>
+        ) : null}
         <View style={styles.row}>
           {price != null && <Text style={styles.price}>${price.toFixed(2)}</Text>}
           {original != null && <Text style={styles.original}>${original.toFixed(2)}</Text>}
@@ -43,6 +54,22 @@ function DealCard({ deal, onView, onQuickClaim }) {
           </TouchableOpacity>
         </View>
       </View>
+      <TouchableOpacity
+        style={styles.shareButton}
+        onPress={(e) => {
+          e.stopPropagation();
+          setShareVisible(true);
+        }}
+        activeOpacity={0.8}
+      >
+        <Share2 size={14} color={colors.textMuted} />
+      </TouchableOpacity>
+      <ShareDealModal
+        visible={shareVisible}
+        onClose={() => setShareVisible(false)}
+        link={dealLink}
+        message={shareMessage}
+      />
     </View>
   );
 }
@@ -60,6 +87,15 @@ const getStyles = (colors) => StyleSheet.create({
   info: { padding: 12 },
   title: { color: colors.text },
   subtitle: { marginTop: 2, color: colors.textMuted },
+  areaRow: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    backgroundColor: colors.primaryLighter,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  areaText: { color: colors.textMuted, fontSize: 11 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   price: { color: colors.primary },
   original: { color: colors.textMuted, textDecorationLine: 'line-through' },
@@ -69,6 +105,19 @@ const getStyles = (colors) => StyleSheet.create({
   viewText: { color: colors.white },
   quickClaim: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   quickClaimIcon: { color: colors.primary },
+  shareButton: {
+    position: 'absolute',
+    right: 12,
+    bottom: 12,
+    width: 22,
+    height: 22,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
 });
 
 // Memoize component to prevent unnecessary re-renders
@@ -78,4 +127,3 @@ export default React.memo(DealCard, (prevProps, nextProps) => {
     prevProps.onView === nextProps.onView &&
     prevProps.onQuickClaim === nextProps.onQuickClaim;
 });
-

@@ -181,7 +181,7 @@ const authAPI = {
     } catch (error) {
       // Handle specific error codes (matching your web app)
       const errorCode = error.error || error.data?.error;
-      
+
       switch (errorCode) {
         case 'MISSING_FIELDS':
           throw { ...error, message: 'Please provide all required information' };
@@ -204,6 +204,23 @@ const authAPI = {
    */
   logout: async () => {
     await authStorage.clearAll();
+  },
+
+  /**
+   * Delete account
+   * DELETE /auth/customer/delete
+   */
+  deleteAccount: async () => {
+    try {
+      // Add language parameter
+      const lang = i18n?.language || 'en';
+      const langValue = (typeof lang === 'string' && lang === 'malay') ? 'malay' : 'en';
+      const langParam = `?lang=${langValue}`;
+      const response = await api.delete(`/auth/customer/delete${langParam}`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
   },
 
   /**
@@ -291,6 +308,56 @@ const authAPI = {
       const langValue = (typeof lang === 'string' && lang === 'malay') ? 'malay' : 'en';
       const langParam = `?lang=${langValue}`;
       const response = await api.put(`/auth/customer/profile${langParam}`, profileData);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Verify Email
+   * POST /auth/customer/verify-email
+   * 
+   * @param {string} userId - User ID
+   * @param {string} otp - 6-digit OTP code
+   * @returns {Promise<Object>} User data and tokens
+   */
+  verifyEmail: async (userId, otp) => {
+    try {
+      const response = await api.post('/auth/customer/verify-email', {
+        userId,
+        otp,
+      });
+
+      // Handle tokens if present (successful verification)
+      const accessToken = response?.data?.tokens?.token || response?.data?.tokens?.access_token || response?.token;
+      const refreshToken = response?.data?.tokens?.refreshToken || response?.data?.tokens?.refresh_token || response?.refreshToken;
+
+      if (accessToken) {
+        await authStorage.setAccessToken(accessToken);
+      }
+      if (refreshToken) {
+        await authStorage.setRefreshToken(refreshToken);
+      }
+
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Resend OTP
+   * POST /auth/customer/resend-otp
+   * 
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} Success message
+   */
+  resendOTP: async (userId) => {
+    try {
+      const response = await api.post('/auth/customer/resend-otp', {
+        userId,
+      });
       return response;
     } catch (error) {
       throw error;

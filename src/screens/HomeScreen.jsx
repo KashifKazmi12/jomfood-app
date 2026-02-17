@@ -11,6 +11,7 @@
 
 import React from 'react';
 import {
+  Alert,
   View,
   Text,
   TextInput,
@@ -30,6 +31,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Pressable } from 'react-native';
 import HomeDealsGridSection from '../components/deals/HomeDealsGridSection';
 import DealCarouselSection from '../components/deals/DealCarouselSection';
+import LazyCategorySection from '../components/deals/LazyCategorySection';
 import GradientBackground from '../components/GradientBackground';
 import { dealsAPI } from '../api/deals';
 import authAPI from '../api/auth';
@@ -44,6 +46,7 @@ import RangeSlider from '../components/RangeSlider';
 import { BottomNavigationSpace } from '../navigation/AppNavigator';
 import { useTranslation } from 'react-i18next';
 import { showToast } from '../components/toast';
+import { useCart } from '../context/CartContext';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -56,6 +59,42 @@ export default function HomeScreen() {
   const typography = useThemeTypography();
   const styles = getStyles(theme, typography);
   const queryClient = useQueryClient();
+  const { addItem, clearCart } = useCart();
+
+  const handleQuickAdd = async (item) => {
+    const result = await addItem(item);
+    if (result?.ok) {
+      showToast.success(t('cart.added', 'Added to cart'), t('cart.openHint', 'Open your cart to checkout.'));
+      return;
+    }
+    if (result?.reason === 'not_logged_in') {
+      showToast.info(t('common.login'), t('common.pleaseSignIn'));
+      return;
+    }
+    if (result?.reason === 'different_restaurant') {
+      Alert.alert(
+        t('cart.replaceTitle', 'Replace cart items?'),
+        t(
+          'cart.replaceMessage',
+          'Your cart can only include deals from one restaurant. Clear current cart and add this deal?'
+        ),
+        [
+          { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+          {
+            text: t('cart.replaceConfirm', 'Clear & Add'),
+            style: 'destructive',
+            onPress: async () => {
+              await clearCart();
+              const retry = await addItem(item);
+              if (retry?.ok) {
+                showToast.success(t('cart.added', 'Added to cart'), t('cart.openHint', 'Open your cart to checkout.'));
+              }
+            },
+          },
+        ]
+      );
+    }
+  };
   const { location: currentLocation, loading: locationLoading, error: locationError } = useLocation();
 
   const [menuVisible, setMenuVisible] = React.useState(false);
@@ -159,11 +198,30 @@ export default function HomeScreen() {
     queryFn: () => dealsAPI.getDealOfTheDay(),
   });
 
-  // Fetch deal categories from new endpoint
+  // Fetch deal categories from new endpoint (for category pills)
   const { data: dealCategories, isLoading: categoriesLoading } = useQuery({
     queryKey: ['jomfood-categories'],
     queryFn: () => dealsAPI.getJomfoodCategories({ limit: 999999, is_active: true }),
   });
+
+  // Fetch deal categories with show_category=true for dynamic sections
+  const { data: categorySections } = useQuery({
+    queryKey: ['deal-categories-sections'],
+    queryFn: () => dealsAPI.getActiveDealCategories({ show_category: true }),
+  });
+
+  // Check if any filters are active - hide category sections when filters are applied
+  const hasActiveFilters = React.useMemo(() => {
+    return !!(
+      filters.deal_type ||
+      filters.min_price > 0 ||
+      filters.max_price < 500 ||
+      filters.min_discount > 0 ||
+      filters.max_discount < 100 ||
+      filters.text_search ||
+      (filters.tags && filters.tags.length > 0)
+    );
+  }, [filters]);
 
   return (
     <GradientBackground>
@@ -328,6 +386,7 @@ export default function HomeScreen() {
                   params={{
                     sort_by: 'discount_desc',
                     is_hot_deal: true,
+                    take_one_item_from_each_restaurant:true,
                     ...(currentLocation && {
                       latitude: currentLocation.latitude,
                       longitude: currentLocation.longitude,
@@ -346,6 +405,7 @@ export default function HomeScreen() {
                     initialFilters: {
                         sort_by: 'discount_desc',
                         is_hot_deal: true,
+                        take_one_item_from_each_restaurant:true,
                         ...(currentLocation && {
                           latitude: currentLocation.latitude,
                           longitude: currentLocation.longitude,
@@ -363,10 +423,7 @@ export default function HomeScreen() {
                     }
                   })}
                   onItemView={handleDealView}
-                  onQuickClaim={async (item) => {
-                    if (!user?._id) { return; }
-                    try { await dealsAPI.claim({ dealId: item._id, customerId: user._id }); } catch { }
-                  }}
+                  onQuickClaim={handleQuickAdd}
                   autoSlide={true}
                   autoSlideInterval={4000}
                 />
@@ -411,13 +468,35 @@ export default function HomeScreen() {
                     }
                   })}
                   onItemView={handleDealView}
-                  onQuickClaim={async (item) => {
-                    if (!user?._id) { return; }
-                    try { await dealsAPI.claim({ dealId: item._id, customerId: user._id }); } catch { }
-                  }}
+                  onQuickClaim={handleQuickAdd}
                   autoSlide={true}
                   autoSlideInterval={4500}
                 />
+
+                {/* Dynamic Category Sections - Lazy Loaded - Only show when no filters are active */}
+                {!hasActiveFilters && categorySections && categorySections.length > 0 && categorySections.map((category) => (
+                  <LazyCategorySection
+                    key={category._id}
+                    category={category}
+                    currentLocation={currentLocation}
+                    onItemView={handleDealView}
+                    onQuickClaim={handleQuickAdd}
+                    onViewAll={(category) => {
+                      navigation.navigate('Deals', {
+                        screen: 'DealsMain',
+                        params: {
+                          initialFilters: {
+                            deal_category_id: category._id,
+                            sort_by: 'discount_desc',
+                            page: 1,
+                            limit: 12
+                          },
+                          screenTitle: category.name
+                        }
+                      });
+                    }}
+                  />
+                ))}
 
                 <View style={{ height: BottomNavigationSpace }} />
               </View>

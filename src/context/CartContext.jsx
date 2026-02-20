@@ -140,7 +140,8 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  const addItem = async (deal) => {
+  const addItem = async (deal, options = {}) => {
+    const { skipBusinessCheck = false } = options;
     const normalized = normalizeDeal(deal);
     if (!normalized || !normalized.id) {
       showToast.error('Error', 'Unable to add this deal right now.');
@@ -152,14 +153,25 @@ export const CartProvider = ({ children }) => {
       return { ok: false, reason: 'not_logged_in' };
     }
 
-    const currentBusinessId = businessId?._id || businessId;
-    if (
-      items.length > 0 &&
-      currentBusinessId &&
-      normalized.business_id &&
-      currentBusinessId.toString() !== normalized.business_id.toString()
-    ) {
-      return { ok: false, reason: 'different_restaurant' };
+    if (!skipBusinessCheck) {
+      const currentBusinessId =
+        businessId?._id ||
+        businessId ||
+        (items.length > 0 ? items[0]?.business_id : null);
+      const incomingBusinessId =
+        normalized.business_id ||
+        deal?.business_id?._id ||
+        deal?.business_id ||
+        deal?.business?._id ||
+        deal?.businessId;
+      if (
+        items.length > 0 &&
+        currentBusinessId &&
+        incomingBusinessId &&
+        currentBusinessId.toString() !== incomingBusinessId.toString()
+      ) {
+        return { ok: false, reason: 'different_restaurant' };
+      }
     }
 
     try {

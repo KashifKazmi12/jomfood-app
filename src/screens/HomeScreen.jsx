@@ -83,13 +83,13 @@ export default function HomeScreen() {
           {
             text: t('cart.replaceConfirm', 'Clear & Add'),
             style: 'destructive',
-            onPress: async () => {
-              await clearCart();
-              const retry = await addItem(item);
-              if (retry?.ok) {
-                showToast.success(t('cart.added', 'Added to cart'), t('cart.openHint', 'Open your cart to checkout.'));
-              }
-            },
+              onPress: async () => {
+                await clearCart();
+                const retry = await addItem(item, { skipBusinessCheck: true });
+                if (retry?.ok) {
+                  showToast.success(t('cart.added', 'Added to cart'), t('cart.openHint', 'Open your cart to checkout.'));
+                }
+              },
           },
         ]
       );

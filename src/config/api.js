@@ -14,7 +14,7 @@ const isDevelopment = __DEV__;
 
 const API_CONFIG = {
   // Development URL (used when running in dev mode)
-  DEV_BASE_URL: 'http://192.168.100.98:5055/api',
+  DEV_BASE_URL: 'http://10.158.6.59:5055/api',
 
   // Production URL (used in release builds)
   // ⚠️ CHANGE THIS TO YOUR LIVE BACKEND URL BEFORE BUILDING RELEASE APK
@@ -23,7 +23,7 @@ const API_CONFIG = {
 
   // Automatically use the right URL based on environment
   BASE_URL: isDevelopment
-    ? 'http://192.168.100.98:5055/api'  // Development
+    ? 'http://10.158.6.59:5055/api'  // Development
     // : 'https://jscapi.altitudeprojects.net/api', // Production - CHANGE THIS!
     : 'https://jscapi.jomsmart.com/api', // Production - CHANGE THIS!
 

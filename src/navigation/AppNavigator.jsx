@@ -30,6 +30,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
 import VerificationScreen from '../screens/VerificationScreen';
+import SetPasswordScreen from '../screens/SetPasswordScreen';
 import DealDetailScreen from '../screens/DealDetailScreen';
 import RestaurantDetailsScreen from '../screens/RestaurantDetailsScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
@@ -611,10 +612,18 @@ function AppNavigatorContent() {
         />
 
         {/* Verification Screen - NO BOTTOM TABS */}
-        {/* Added for Email Verification Flow */}
         <Stack.Screen
           name="Verification"
           component={VerificationScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+
+        {/* Set Password Screen - NO BOTTOM TABS */}
+        <Stack.Screen
+          name="SetPassword"
+          component={SetPasswordScreen}
           options={{
             headerShown: false,
           }}

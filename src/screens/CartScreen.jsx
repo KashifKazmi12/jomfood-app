@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Platform,
   ScrollView,
@@ -130,6 +131,28 @@ export default function CartScreen() {
       return;
     }
     setShowIosPicker(true);
+  };
+
+  const confirmRemoveItem = (itemId, itemName) => {
+    Alert.alert(
+      t('cart.removeItemTitle', 'Remove Item'),
+      t('cart.removeItemMessage', 'Are you sure you want to remove "{{name}}" from your cart?', { name: itemName }),
+      [
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+        { text: t('common.delete', 'Remove'), style: 'destructive', onPress: () => removeItem(itemId) },
+      ]
+    );
+  };
+
+  const confirmClearCart = () => {
+    Alert.alert(
+      t('cart.clearCartTitle', 'Clear Cart'),
+      t('cart.clearCartMessage', 'Are you sure you want to remove all items from your cart?'),
+      [
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+        { text: t('cart.clear', 'Clear Cart'), style: 'destructive', onPress: () => clearCart() },
+      ]
+    );
   };
 
   useEffect(() => {
@@ -276,7 +299,7 @@ export default function CartScreen() {
                         <Text style={styles.itemPrice}>
                           {formatCurrency(Number(item.deal_total || 0) * Number(item.quantity || 1))}
                         </Text>
-                        <TouchableOpacity onPress={() => removeItem(item.id)} style={styles.removeButton}>
+                        <TouchableOpacity onPress={() => confirmRemoveItem(item.id, item.deal_name)} style={styles.removeButton}>
                           <Trash2 size={16} color={colors.textMuted} />
                         </TouchableOpacity>
                       </View>
@@ -374,7 +397,7 @@ export default function CartScreen() {
                       </Text>
                     )}
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.clearButton} onPress={clearCart}>
+                  <TouchableOpacity style={styles.clearButton} onPress={confirmClearCart}>
                     <Text style={styles.clearButtonText}>{t('cart.clear', 'Clear Cart')}</Text>
                   </TouchableOpacity>
                 </View>
@@ -573,14 +596,17 @@ const getStyles = (colors, typography) => StyleSheet.create({
     overflow: 'hidden',
   },
   iosPickerDone: {
-    paddingVertical: 10,
+    paddingVertical: 14,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    marginTop: 8,
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
   },
   iosPickerDoneText: {
-    color: colors.primary,
-    fontSize: typography.fontSize.sm,
+    color: colors.white,
+    fontSize: typography.fontSize.base,
     fontFamily: typography.fontFamily.semiBold,
   },
   summary: {

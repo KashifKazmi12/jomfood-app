@@ -21,6 +21,7 @@
     "required": "Required",
     "orContinueWith": "Or continue with",
     "continueWithGoogle": "Continue With Google",
+    "continueWithApple": "Continue With Apple",
     "dontHaveAccount": "Don't have an account?",
     "signUp": "Sign up",
     "alreadyHaveAccount": "Already have an account?",
@@ -77,6 +78,8 @@
     "loginFailedMessage": "Login failed. Please try again.",
     "googleSignInFailed": "Google Sign-In failed",
     "failedToSignInWithGoogle": "Failed to sign in with Google. Please try again.",
+    "appleSignInFailed": "Apple Sign-In failed",
+    "failedToSignInWithApple": "Failed to sign in with Apple. Please try again.",
     "accountCreated": "Account created",
     "welcomeMessage": "Welcome, {{name}}!",
     "registrationFailed": "Registration failed",
@@ -84,6 +87,7 @@
     "emailAndPasswordRequired": "Email and password are required",
     "nameEmailPasswordRequired": "Name, email and password are required",
     "nameEmailPasswordPhoneRequired": "Name, email, phone and password are required",
+    "nameEmailPhoneRequired": "Name, email and phone are required",
     "view": "View",
     "viewDetails": "View Details",
     "noDealsAvailable": "No deals available",
@@ -116,6 +120,9 @@
     "findYourFavouriteFood": "Find Your Favourite",
     "food": "Food",
     "fast": "Fast!!",
+    "heroTitle": "Discover Amazing Food Deals!",
+    "heroSubtitle": "From local warungs to premium restaurants - save more, eat better!",
+    "searchPlaceholder": "Search restaurants or cuisine...",
     "hotDeals": "Hot Deals",
     "topDealsNearMe": "Top deals Near Me",
     "exploreCategories": "Explore Categories",
@@ -187,6 +194,24 @@
     "passwordPlaceholder": "Pass@1234",
     "phonePlaceholder": "0123456789"
   },
+  "setPassword": {
+    "title": "Set Your Password",
+    "subtitle": "Your email has been verified. Please create a password to secure your account.",
+    "newPassword": "New Password",
+    "newPasswordPlaceholder": "Enter your password",
+    "confirmPassword": "Confirm Password",
+    "confirmPasswordPlaceholder": "Re-enter your password",
+    "hint": "Password must be at least 6 characters long.",
+    "submit": "Set Password",
+    "success": "Password set successfully!",
+    "failed": "Failed to set password. Please try again.",
+    "minLength": "Password must be at least 6 characters long.",
+    "mismatch": "Passwords do not match."
+  },
+  "verification": {
+    "emailVerifiedSuccess": "Email verified successfully!",
+    "emailVerifiedSetPassword": "Email verified! Please set your password."
+  },
   "deals": {
     "allDeals": "All Deals",
     "hotDealsToday": "Hot Deals Today",
@@ -239,7 +264,11 @@
     "viewMyDeals": "View My Deals",
     "backToDeals": "Back to Deals",
     "tryAgain": "Try Again",
-    "openPayment": "Open Payment Page"
+    "openPayment": "Open Payment Page",
+    "removeItemTitle": "Remove Item",
+    "removeItemMessage": "Are you sure you want to remove \"{{name}}\" from your cart?",
+    "clearCartTitle": "Clear Cart",
+    "clearCartMessage": "Are you sure you want to remove all items from your cart?"
   },
   "dealDetail": {
     "claimDeal": "Claim Deal",

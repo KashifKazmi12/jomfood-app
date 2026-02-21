@@ -98,10 +98,12 @@ const authAPI = {
       const payload = {
         name: userData.name.trim(),
         email: userData.email.trim(),
-        password: userData.password,
       };
 
-      // Add phone if provided
+      if (userData.password) {
+        payload.password = userData.password;
+      }
+
       if (userData.phone && userData.phone.trim()) {
         payload.phone = userData.phone.trim();
       }
@@ -200,6 +202,68 @@ const authAPI = {
   },
 
   /**
+   * Apple OAuth Authentication
+   *
+   * @param {Object} userInfo - Apple user info from Sign in with Apple
+   * @returns {Promise<Object>} User data and tokens
+   */
+  appleOAuth: async (userInfo) => {
+    try {
+      const response = await api.post('/auth/customer/apple', {
+        identityToken: userInfo.identityToken,
+        authorizationCode: userInfo.authorizationCode,
+        email: userInfo.email,
+        name: userInfo.name,
+        is_mobile: true,
+      });
+
+      const accessToken = response?.data?.tokens?.access_token ?? response?.data?.token ?? response?.token;
+      const refreshToken = response?.data?.tokens?.refresh_token ?? response?.data?.refreshToken ?? response?.refreshToken;
+
+      if (accessToken) {
+        await authStorage.setAccessToken(accessToken);
+      }
+      if (refreshToken) {
+        await authStorage.setRefreshToken(refreshToken);
+      }
+
+      let user = null;
+      try {
+        const meResponse = await api.get('/auth/customer/me');
+        const isInvalid = meResponse?.status === false || meResponse?.token === 'expired';
+        if (isInvalid) {
+          throw { message: meResponse?.message || 'Unauthorized', error: 'UNAUTHORIZED' };
+        }
+        user = meResponse?.user || meResponse?.data?.user || meResponse?.data || meResponse || null;
+      } catch (e) {
+        user = response.data?.user || response.user || null;
+      }
+
+      return {
+        user,
+        tokens: { access_token: accessToken, refresh_token: refreshToken },
+      };
+    } catch (error) {
+      const errorCode = error.error || error.data?.error;
+
+      switch (errorCode) {
+        case 'MISSING_FIELDS':
+          throw { ...error, message: 'Please provide all required information' };
+        case 'INVALID_TOKEN':
+          throw { ...error, message: 'Invalid Apple token. Please try again.' };
+        case 'EMAIL_REQUIRED':
+          throw { ...error, message: 'Email is required. Please allow email sharing with Apple Sign-In.' };
+        case 'APPLE_ACCOUNT_CONFLICT':
+          throw { ...error, message: 'This email is already linked to a different Apple account.' };
+        case 'SERVER_ERROR':
+          throw { ...error, message: 'Server error. Please try again later.' };
+        default:
+          throw error;
+      }
+    }
+  },
+
+  /**
    * Logout - Clear tokens
    */
   logout: async () => {
@@ -270,7 +334,6 @@ const authAPI = {
    */
   changePassword: async (oldPassword, newPassword) => {
     try {
-      // Add language parameter
       const lang = i18n?.language || 'en';
       const langValue = (typeof lang === 'string' && lang === 'malay') ? 'malay' : 'en';
       const langParam = `?lang=${langValue}`;
@@ -278,6 +341,15 @@ const authAPI = {
         oldPassword,
         newPassword,
       });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  setPassword: async (password) => {
+    try {
+      const response = await api.put('/auth/customer/set-password', { password });
       return response;
     } catch (error) {
       throw error;

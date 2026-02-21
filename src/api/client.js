@@ -132,6 +132,7 @@ const shouldSkipRefresh = (endpoint) => {
     path.includes('/auth/customer/login') ||
     path.includes('/auth/customer/register') ||
     path.includes('/auth/customer/google') ||
+    path.includes('/auth/customer/apple') ||
     path.includes('/auth/customer/refresh')
   );
 };

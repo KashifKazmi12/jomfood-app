@@ -21,6 +21,7 @@
     "required": "Diperlukan",
     "orContinueWith": "Atau teruskan dengan",
     "continueWithGoogle": "Teruskan Dengan Google",
+    "continueWithApple": "Teruskan Dengan Apple",
     "dontHaveAccount": "Tiada akaun?",
     "signUp": "Daftar",
     "alreadyHaveAccount": "Sudah ada akaun?",
@@ -77,6 +78,8 @@
     "loginFailedMessage": "Log masuk gagal. Sila cuba lagi.",
     "googleSignInFailed": "Log masuk Google gagal",
     "failedToSignInWithGoogle": "Gagal log masuk dengan Google. Sila cuba lagi.",
+    "appleSignInFailed": "Log masuk Apple gagal",
+    "failedToSignInWithApple": "Gagal log masuk dengan Apple. Sila cuba lagi.",
     "accountCreated": "Akaun dicipta",
     "welcomeMessage": "Selamat datang, {{name}}!",
     "registrationFailed": "Pendaftaran gagal",
@@ -84,6 +87,7 @@
     "emailAndPasswordRequired": "E-mel dan kata laluan diperlukan",
     "nameEmailPasswordRequired": "Nama, e-mel dan kata laluan diperlukan",
     "nameEmailPasswordPhoneRequired": "Nama, e-mel, telefon dan kata laluan diperlukan",
+    "nameEmailPhoneRequired": "Nama, e-mel dan telefon diperlukan",
     "view": "Lihat",
     "viewDetails": "Lihat Butiran",
     "noDealsAvailable": "Tiada tawaran tersedia",
@@ -116,6 +120,9 @@
     "findYourFavouriteFood": "Cari Makanan",
     "food": "Kegemaran Anda",
     "fast": "Dengan Pantas!!",
+    "heroTitle": "Temui Tawaran Makanan Hebat!",
+    "heroSubtitle": "Dari warung tempatan ke restoran premium - jimat lebih, makan lebih baik!",
+    "searchPlaceholder": "Cari restoran atau masakan...",
     "hotDeals": "Tawaran Panas",
     "topDealsNearMe": "Tawaran teratas berhampiran saya",
     "exploreCategories": "Terokai Kategori",
@@ -187,6 +194,24 @@
     "passwordPlaceholder": "Pass@1234",
     "phonePlaceholder": "0123456789"
   },
+  "setPassword": {
+    "title": "Tetapkan Kata Laluan Anda",
+    "subtitle": "E-mel anda telah disahkan. Sila cipta kata laluan untuk melindungi akaun anda.",
+    "newPassword": "Kata Laluan Baharu",
+    "newPasswordPlaceholder": "Masukkan kata laluan anda",
+    "confirmPassword": "Sahkan Kata Laluan",
+    "confirmPasswordPlaceholder": "Masukkan semula kata laluan anda",
+    "hint": "Kata laluan mestilah sekurang-kurangnya 6 aksara.",
+    "submit": "Tetapkan Kata Laluan",
+    "success": "Kata laluan berjaya ditetapkan!",
+    "failed": "Gagal menetapkan kata laluan. Sila cuba lagi.",
+    "minLength": "Kata laluan mestilah sekurang-kurangnya 6 aksara.",
+    "mismatch": "Kata laluan tidak sepadan."
+  },
+  "verification": {
+    "emailVerifiedSuccess": "E-mel berjaya disahkan!",
+    "emailVerifiedSetPassword": "E-mel disahkan! Sila tetapkan kata laluan anda."
+  },
   "deals": {
     "allDeals": "Semua Tawaran",
     "hotDealsToday": "Tawaran Panas Hari Ini",
@@ -239,7 +264,11 @@
     "viewMyDeals": "Lihat Tawaran Saya",
     "backToDeals": "Kembali ke Tawaran",
     "tryAgain": "Cuba Lagi",
-    "openPayment": "Buka Halaman Pembayaran"
+    "openPayment": "Buka Halaman Pembayaran",
+    "removeItemTitle": "Buang Item",
+    "removeItemMessage": "Adakah anda pasti mahu membuang \"{{name}}\" dari troli anda?",
+    "clearCartTitle": "Kosongkan Troli",
+    "clearCartMessage": "Adakah anda pasti mahu membuang semua item dari troli anda?"
   },
   "dealDetail": {
     "claimDeal": "Tuntut Tawaran",

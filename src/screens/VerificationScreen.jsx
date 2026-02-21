@@ -91,23 +91,29 @@ export default function VerificationScreen() {
             // Or sometimes just { user: ... } depending on structure, but we standardised in auth.js
 
             const user = response?.data?.user || response?.user;
+            const requiresPasswordSetup = response?.data?.requiresPasswordSetup === true;
 
             if (user) {
-                dispatch(setUser(user));
                 dispatch(setLoading(false));
 
-                // Update FCM if possible
-                if (user._id) {
-                    updateFCMTokenWithCustomerId(user._id).catch(() => { });
+                if (requiresPasswordSetup) {
+                    showToast.success(t('common.success'), t('verification.emailVerifiedSetPassword'));
+
+                    navigation.replace('SetPassword', { user });
+                } else {
+                    dispatch(setUser(user));
+
+                    if (user._id) {
+                        updateFCMTokenWithCustomerId(user._id).catch(() => { });
+                    }
+
+                    showToast.success(t('common.success'), t('verification.emailVerifiedSuccess'));
+
+                    navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'RootTabs' }],
+                    });
                 }
-
-                showToast.success(t('common.success'), "Email verified successfully!");
-
-                // Navigate and reset stack to prevent going back to verification/login
-                navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'RootTabs' }],
-                });
             } else {
                 throw new Error("Invalid response from server");
             }

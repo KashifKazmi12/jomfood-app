@@ -192,7 +192,7 @@ export default function HomeScreen() {
     }
   }, [queryClient]);
 
-  // Fetch deal of the day
+  // Fetch deal of the day (used as hero background)
   const { data: dealOfTheDay } = useQuery({
     queryKey: ['deal-of-the-day'],
     queryFn: () => dealsAPI.getDealOfTheDay(),
@@ -303,22 +303,24 @@ export default function HomeScreen() {
           </View>
         </ImageBackground> */}
 
-                <View style={styles.hero}>
-                  <Text style={styles.heroTitle}>{t('home.findYourFavouriteFood')}{'\n'}<Text style={styles.heroTitleHighlight}>{t('home.food')}</Text>, {t('home.fast')}</Text>
-                  {dealOfTheDay && (
+                <ImageBackground
+                  source={dealOfTheDay ? { uri: dealOfTheDay.image } : undefined}
+                  style={styles.heroBanner}
+                  imageStyle={styles.heroBannerImage}
+                >
+                  <View style={styles.heroOverlay} />
+                  <View style={styles.heroContent}>
+                    <Text style={styles.heroTitle}>{t('home.heroTitle')}</Text>
+                    <Text style={styles.heroSubtitle}>{t('home.heroSubtitle')}</Text>
                     <TouchableOpacity
-                      activeOpacity={0.9}
-                      onPress={() => navigation.navigate('DealDetail', { id: dealOfTheDay.deal_id })}
+                      style={styles.searchBar}
+                      onPress={handleFilterPress}
+                      activeOpacity={0.7}
                     >
-                      <ImageBackground
-                        source={{ uri: dealOfTheDay.image }}
-                        style={styles.heroImage}
-                        imageStyle={styles.heroImage}
-                      >
-                      </ImageBackground>
+                      <Text style={styles.searchBarPlaceholder}>{t('home.searchPlaceholder')}</Text>
                     </TouchableOpacity>
-                  )}
-                </View>
+                  </View>
+                </ImageBackground>
 
                 {/* Filter Section - Text and Button */}
                 {/* <View style={styles.filterSection}>
@@ -788,34 +790,56 @@ const getStyles = (colors, typography) => StyleSheet.create({
     color: colors.white,
     fontFamily: typography.fontFamily.semiBold,
   },
-  hero: {
-    paddingTop: 6,
-    paddingBottom: 14,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+  heroBanner: {
+    marginTop: 8,
+    height: 170,
+    borderRadius: 12,
     overflow: 'hidden',
-    gap: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
+  },
+  heroBannerImage: {
+    borderRadius: 12,
+  },
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderRadius: 12,
+  },
+  heroContent: {
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    width: '100%',
+    gap: 2,
   },
   heroTitle: {
     fontFamily: typography.fontFamily.bold,
-    fontSize: typography.fontSize['2xl'],
-    lineHeight: 27.25, // 109% of 25px
-    letterSpacing: 0,
-    color: colors.text,
+    fontSize: typography.fontSize.lg,
+    lineHeight: 24,
+    color: colors.white,
+    textAlign: 'center',
   },
-  heroTitleHighlight: {
-    fontFamily: typography.fontFamily.bold,
-    fontSize: 25,
-    lineHeight: 27.25,
-    letterSpacing: 0,
-    // color: colors.black,
+  heroSubtitle: {
+    fontFamily: typography.fontFamily.regular,
+    fontSize: typography.fontSize.xs,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    lineHeight: 17,
+    marginBottom: 6,
+    paddingHorizontal: 20,
   },
-  heroImage: {
-    borderRadius: 10,
-    // borderBottomRightRadius: 28,
-    width: '99.9%',
-    height: 220,
-    alignSelf: 'center',
+  searchBar: {
+    width: '100%',
+    backgroundColor: colors.white,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  searchBarPlaceholder: {
+    fontFamily: typography.fontFamily.regular,
+    fontSize: typography.fontSize.sm,
+    color: colors.textMuted,
   },
   
   // Categories Section - Horizontal pill buttons

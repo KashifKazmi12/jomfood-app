@@ -34,6 +34,7 @@ import authAPI from '../api/auth';
 import useThemeColors from '../theme/useThemeColors';
 import Logo from '../components/Logo';
 import { signInWithGoogle } from '../utils/googleSignIn';
+import { signInWithApple, isAppleSignInAvailable } from '../utils/appleSignIn';
 import Svg, { Path } from 'react-native-svg';
 import useThemeTypography from '../theme/useThemeTypography';
 import { useTranslation } from 'react-i18next';
@@ -59,6 +60,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   const [isSubmittingGoogle, setIsSubmittingGoogle] = useState(false);
+  const [isSubmittingApple, setIsSubmittingApple] = useState(false);
 
   // Phone prompt state
   const [showPhonePrompt, setShowPhonePrompt] = useState(false);
@@ -278,6 +280,48 @@ export default function LoginScreen() {
     }
   };
 
+  const handleAppleSignIn = async () => {
+    if (isSubmittingForm || isSubmittingGoogle || isSubmittingApple) return;
+
+    setIsSubmittingApple(true);
+    dispatch(setLoading(true));
+
+    try {
+      const appleUserInfo = await signInWithApple();
+      const response = await authAPI.appleOAuth(appleUserInfo);
+
+      if (response.user) {
+        dispatch(setUser(response.user));
+        dispatch(setLoading(false));
+
+        if (response.user._id) {
+          try {
+            await updateFCMTokenWithCustomerId(response.user._id);
+          } catch (err) {
+            // Don't block login if FCM update fails
+          }
+        }
+
+        if (!response.user.phone) {
+          setLoggedInUser(response.user);
+          setPhoneInput('');
+          setPhoneError('');
+          setShowPhonePrompt(true);
+        } else {
+          showToast.success(t('common.loggedIn'), t('common.welcomeBackMessage'));
+          navigateAfterLogin();
+        }
+      }
+    } catch (error) {
+      dispatch(setLoading(false));
+      if (error.cancelled) return;
+      const errorMessage = error.message || t('common.failedToSignInWithApple');
+      showToast.error(t('common.appleSignInFailed'), errorMessage);
+    } finally {
+      setIsSubmittingApple(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
@@ -358,21 +402,41 @@ export default function LoginScreen() {
           </View>
 
           {/* Google Sign In Button */}
-          {Platform.OS === 'android' && (
+          <TouchableOpacity
+            style={[styles.googleButton, isSubmittingGoogle && styles.buttonDisabled]}
+            onPress={handleGoogleSignIn}
+            disabled={isSubmittingForm || isSubmittingGoogle || isSubmittingApple}
+          >
+            {isSubmittingGoogle ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <View style={styles.googleButtonContent}>
+                <View style={styles.googleIconContainer}>
+                  <GoogleIconSVG />
+                </View>
+                <View style={styles.googleButtonTextContainer}>
+                  <Text style={styles.googleButtonText}>{t('common.continueWithGoogle')}</Text>
+                </View>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Apple Sign In Button */}
+          {isAppleSignInAvailable() && (
             <TouchableOpacity
-              style={[styles.googleButton, isSubmittingGoogle && styles.buttonDisabled]}
-              onPress={handleGoogleSignIn}
-              disabled={isSubmittingForm || isSubmittingGoogle}
+              style={[styles.appleButton, isSubmittingApple && styles.buttonDisabled]}
+              onPress={handleAppleSignIn}
+              disabled={isSubmittingForm || isSubmittingGoogle || isSubmittingApple}
             >
-              {isSubmittingGoogle ? (
+              {isSubmittingApple ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
-                <View style={styles.googleButtonContent}>
-                  <View style={styles.googleIconContainer}>
-                    <GoogleIconSVG />
+                <View style={styles.appleButtonContent}>
+                  <View style={styles.appleIconContainer}>
+                    <AppleIconSVG />
                   </View>
-                  <View style={styles.googleButtonTextContainer}>
-                    <Text style={styles.googleButtonText}>{t('common.continueWithGoogle')}</Text>
+                  <View style={styles.appleButtonTextContainer}>
+                    <Text style={styles.appleButtonText}>{t('common.continueWithApple')}</Text>
                   </View>
                 </View>
               )}
@@ -476,6 +540,17 @@ function GoogleIconSVG() {
       <Path
         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
         fill="#EA4335"
+      />
+    </Svg>
+  );
+}
+
+function AppleIconSVG() {
+  return (
+    <Svg width="18" height="18" viewBox="0 0 24 24">
+      <Path
+        d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"
+        fill="#FFFFFF"
       />
     </Svg>
   );
@@ -605,6 +680,49 @@ const getStyles = (colors, typography) => StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.base,
     fontFamily: typography.fontFamily.medium,
+    letterSpacing: 0.1,
+    fontFamily: typography.fontFamily.regular,
+  },
+  appleButton: {
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    backgroundColor: '#000000',
+    minHeight: 48,
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    marginTop: 12,
+  },
+  appleButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    position: 'relative',
+  },
+  appleIconContainer: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#000000',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appleButtonTextContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appleButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.base,
     letterSpacing: 0.1,
     fontFamily: typography.fontFamily.regular,
   },

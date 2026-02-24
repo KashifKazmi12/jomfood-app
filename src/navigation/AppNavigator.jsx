@@ -17,7 +17,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Home, MapPin, User, ShoppingBag } from 'lucide-react-native';
+import { Home, MapPin, User, ShoppingBag, ShoppingCart } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useNotifications } from '../context/NotificationContext';
 import InAppNotificationBanner from '../components/InAppNotificationBanner';
@@ -44,11 +44,57 @@ import useThemeColors from '../theme/useThemeColors';
 import useThemeTypography from '../theme/useThemeTypography';
 import typography from '../constants/typography';
 import BottomSafeArea from '../components/BottomSafeArea';
+import { useCart } from '../context/CartContext';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 export const BottomNavigationSpace = 100;
+
+function HeaderCartButton() {
+  const navigation = useNavigation();
+  const colors = useThemeColors();
+  const { items } = useCart();
+  const cartCount = items.reduce((sum, item) => sum + Number(item.quantity || 1), 0);
+
+  const handlePress = () => {
+    navigation.getParent()?.navigate('Cart');
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={handlePress}
+      activeOpacity={0.7}
+      style={{ marginRight: 4, padding: 6 }}
+      accessibilityLabel="Open cart"
+      testID="deal-header-cart-button"
+    >
+      <View style={{ position: 'relative' }}>
+        <ShoppingCart size={20} color={colors.primary} />
+        {cartCount > 0 && (
+          <View
+            style={{
+              position: 'absolute',
+              top: -6,
+              right: -8,
+              minWidth: 16,
+              height: 16,
+              borderRadius: 8,
+              backgroundColor: '#FE8100',
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingHorizontal: 4,
+            }}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 10, fontFamily: typography.fontFamily.semiBold }}>
+              {cartCount}
+            </Text>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 // ==========================================
 // BOTTOM TAB BAR COMPONENT
@@ -186,6 +232,7 @@ function HomeStackNavigator() {
         options={{
           title: 'Deal',
           headerBackTitleVisible: false,
+          headerRight: () => <HeaderCartButton />,
         }}
       />
       <HomeStack.Screen
@@ -226,6 +273,7 @@ function DealsStackNavigator() {
         options={{
           title: 'Deal',
           headerBackTitleVisible: false,
+          headerRight: () => <HeaderCartButton />,
         }}
       />
       <DealsStack.Screen
@@ -265,6 +313,7 @@ function MyDealsStackNavigator() {
         options={{
           title: 'Deal',
           headerBackTitleVisible: false,
+          headerRight: () => <HeaderCartButton />,
         }}
       />
       <MyDealsStack.Screen
@@ -304,6 +353,7 @@ function ProfileStackNavigator() {
         options={{
           title: 'Deal',
           headerBackTitleVisible: false,
+          headerRight: () => <HeaderCartButton />,
         }}
       />
       <ProfileStack.Screen

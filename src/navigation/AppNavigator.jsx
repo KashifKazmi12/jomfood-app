@@ -138,6 +138,14 @@ function CustomTabBar({ state, descriptors, navigation }) {
               return null;
             }
 
+            const getMainScreenForTab = (tabName) => {
+              if (tabName === 'Home') return 'HomeMain';
+              if (tabName === 'Deals') return 'DealsMain';
+              if (tabName === 'MyDeals') return 'MyDealsMain';
+              if (tabName === 'Profile') return 'ProfileMain';
+              return undefined;
+            };
+
             const onPress = () => {
               const event = navigation.emit({
                 type: 'tabPress',
@@ -145,8 +153,14 @@ function CustomTabBar({ state, descriptors, navigation }) {
                 canPreventDefault: true,
               });
 
-              if (!isFocused && !event.defaultPrevented) {
-                navigation.navigate(route.name);
+              if (!event.defaultPrevented) {
+                const mainScreen = getMainScreenForTab(route.name);
+                if (mainScreen) {
+                  // Always reset to each tab's root screen to avoid reopening stale detail pages.
+                  navigation.navigate(route.name, { screen: mainScreen });
+                } else {
+                  navigation.navigate(route.name);
+                }
               }
             };
 
@@ -217,6 +231,7 @@ function HomeStackNavigator() {
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
         headerTitleStyle: { color: colors.text },
+        headerBackButtonDisplayMode: 'minimal',
         headerTransparent: false,
         headerShadowVisible: false,
       }}
@@ -257,6 +272,7 @@ function DealsStackNavigator() {
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
         headerTitleStyle: { color: colors.text },
+        headerBackButtonDisplayMode: 'minimal',
         headerTransparent: false,
         headerShadowVisible: false,
       }}
@@ -298,6 +314,7 @@ function MyDealsStackNavigator() {
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
         headerTitleStyle: { color: colors.text },
+        headerBackButtonDisplayMode: 'minimal',
         headerTransparent: false,
         headerShadowVisible: false,
       }}
@@ -338,6 +355,7 @@ function ProfileStackNavigator() {
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
         headerTitleStyle: { color: colors.text },
+        headerBackButtonDisplayMode: 'minimal',
         headerTransparent: false,
         headerShadowVisible: false,
       }}
@@ -612,6 +630,7 @@ function AppNavigatorContent() {
           headerTitleStyle: {
             color: colors.text,
           },
+          headerBackButtonDisplayMode: 'minimal',
           headerTransparent: false,
           headerShadowVisible: false,
           contentStyle: {

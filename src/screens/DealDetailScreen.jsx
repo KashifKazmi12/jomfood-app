@@ -78,12 +78,22 @@ export default function DealDetailScreen() {
   const shareMessage = `Hey! Check out this awesome deal I found for ${name} at ${company}! Check it out here: ${dealLink} Let's go together!`;
 console.log('Company is:', company)
 
+  const openCartScreen = () => {
+    const parentNavigation = navigation.getParent?.();
+    if (parentNavigation?.navigate) {
+      parentNavigation.navigate('Cart');
+      return;
+    }
+    navigation.navigate('Cart');
+  };
+
   const handleAddToCart = async () => {
     try {
       setIsClaiming(true);
       const result = await addItem(deal);
       if (result?.ok) {
         showToast.success(t('cart.added', 'Added to cart'), t('cart.openHint', 'Open your cart to checkout.'));
+        openCartScreen();
         return;
       }
       if (result?.reason === 'not_logged_in') {
@@ -107,6 +117,7 @@ console.log('Company is:', company)
                   const retry = await addItem(deal, { skipBusinessCheck: true });
                   if (retry?.ok) {
                     showToast.success(t('cart.added', 'Added to cart'), t('cart.openHint', 'Open your cart to checkout.'));
+                    openCartScreen();
                   }
                 },
               },

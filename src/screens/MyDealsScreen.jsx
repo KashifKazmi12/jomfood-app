@@ -404,7 +404,7 @@ export default function MyDealsScreen() {
     >
       <View style={styles.historyItemContent}>
         <View style={styles.historyItemHeader}>
-          <Text style={styles.historyDealName} numberOfLines={1}>
+          <Text style={styles.historyDealName} numberOfLines={1} ellipsizeMode="tail">
             {claim.dealName}
           </Text>
           <View style={styles.statusBadgeContainer}>
@@ -1004,17 +1004,17 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontFamily: typography.fontFamily.semiBold,
     color: colors.text,
     flex: 1,
+    flexShrink: 1,
     marginRight: 8,
   },
   statusBadgeContainer: {
     marginTop: 0,
     marginBottom: 0,
-    position: 'relative'
+    marginLeft: 8,
+    flexShrink: 0,
+    alignSelf: 'flex-start',
   },
   statusBadge: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,

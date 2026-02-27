@@ -31,6 +31,7 @@ import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
 import VerificationScreen from '../screens/VerificationScreen';
 import SetPasswordScreen from '../screens/SetPasswordScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import DealDetailScreen from '../screens/DealDetailScreen';
 import RestaurantDetailsScreen from '../screens/RestaurantDetailsScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
@@ -676,6 +677,15 @@ function AppNavigatorContent() {
           component={SignupScreen}
           options={{
             title: 'SignUp',
+            headerBackTitleVisible: false,
+          }}
+        />
+
+        <Stack.Screen
+          name="ForgotPassword"
+          component={ForgotPasswordScreen}
+          options={{
+            title: 'Forgot Password',
             headerBackTitleVisible: false,
           }}
         />

@@ -40,6 +40,7 @@ import useThemeTypography from '../theme/useThemeTypography';
 import { useTranslation } from 'react-i18next';
 import { updateFCMTokenWithCustomerId } from '../utils/initializeNotifications';
 import { useQueryClient } from '@tanstack/react-query';
+import PhoneNumberInput from '../components/common/PhoneNumberInput';
 
 export default function LoginScreen() {
   const navigation = useNavigation();
@@ -212,6 +213,10 @@ export default function LoginScreen() {
     navigation.navigate('Signup');
   };
 
+  const navigateToForgotPassword = () => {
+    navigation.navigate('ForgotPassword');
+  };
+
   /**
    * Handle Google Sign-In
    */
@@ -379,6 +384,11 @@ export default function LoginScreen() {
               onSubmitEditing={handleSubmit}
               editable={!isSubmittingForm && !isSubmittingGoogle}
             />
+            <TouchableOpacity style={styles.forgotPasswordContainer} onPress={navigateToForgotPassword}>
+              <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
+                {t('auth.forgotPassword', 'Forgot Password?')}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* Login Button */}
@@ -402,7 +412,7 @@ export default function LoginScreen() {
           </View>
 
           {/* Google Sign In Button */}
-          <TouchableOpacity
+          {Platform.OS === 'android' && <TouchableOpacity
             style={[styles.googleButton, isSubmittingGoogle && styles.buttonDisabled]}
             onPress={handleGoogleSignIn}
             disabled={isSubmittingForm || isSubmittingGoogle || isSubmittingApple}
@@ -419,7 +429,7 @@ export default function LoginScreen() {
                 </View>
               </View>
             )}
-          </TouchableOpacity>
+          </TouchableOpacity>}
 
           {/* Apple Sign In Button */}
           {isAppleSignInAvailable() && (
@@ -481,16 +491,13 @@ export default function LoginScreen() {
             <Text style={styles.phoneModalTitle}>{t('common.addPhoneTitle')}</Text>
             <Text style={styles.phoneModalSubtitle}>{t('common.addPhoneSubtitle')}</Text>
 
-            <TextInput
-              style={styles.phoneInput}
-              placeholder={t('common.enterYourPhoneNumber')}
-              placeholderTextColor={colors.textMuted}
+            <PhoneNumberInput
               value={phoneInput}
-              onChangeText={(value) => {
+              onChange={(value) => {
                 setPhoneInput(value);
                 setPhoneError('');
               }}
-              keyboardType="phone-pad"
+              placeholder={t('common.enterYourPhoneNumber')}
             />
             {phoneError ? <Text style={styles.phoneError}>{phoneError}</Text> : null}
 
@@ -591,6 +598,14 @@ const getStyles = (colors, typography) => StyleSheet.create({
   },
   inputContainer: {
     marginBottom: 16,
+  },
+  forgotPasswordContainer: {
+    marginTop: 8,
+    alignSelf: 'flex-end',
+  },
+  forgotPasswordText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.semiBold,
   },
   label: {
     color: colors.text,

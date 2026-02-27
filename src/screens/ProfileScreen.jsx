@@ -10,6 +10,7 @@ import {
   Image,
   Modal,
   Alert,
+  Share,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback
@@ -24,13 +25,15 @@ import authAPI from '../api/auth';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import GradientBackground from '../components/GradientBackground';
 import { showToast } from '../components/toast';
-import { User, Mail, Phone, Lock, Edit2, X, Save, LogOut, Bell, Globe } from 'lucide-react-native';
+import { Phone, Lock, Edit2, X, Save, LogOut, Bell, Globe, Share2 } from 'lucide-react-native';
 import useLanguage from '../i18n/useLanguage';
 import LoginPrompt from '../components/LoginPrompt';
 import { useTranslation } from 'react-i18next';
 import { removeCustomerIdFromFCMToken } from '../utils/initializeNotifications';
+import PhoneNumberInput from '../components/common/PhoneNumberInput';
 
 export default function ProfileScreen() {
+  const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.jomfood';
   const user = useSelector(state => state.auth.user);
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -128,13 +131,10 @@ export default function ProfileScreen() {
     if (!editForm.name.trim()) {
       errors.name = t('common.nameRequired');
     }
-    if (!editForm.phone.trim()) {
-      errors.phone = t('common.phoneRequired');
-    }
 
     setEditErrors(errors);
 
-    const hasErrors = errors.name || errors.phone;
+    const hasErrors = errors.name;
     if (hasErrors) {
       return;
     }
@@ -201,6 +201,19 @@ export default function ProfileScreen() {
     );
   };
 
+  const handleShareApp = async () => {
+    try {
+      await Share.share({
+        message: `${t('common.shareAppMessage', 'Download JomFood app from Google Play:')} ${PLAY_STORE_URL}`,
+      });
+    } catch (error) {
+      showToast.error(
+        t('common.shareFailed', 'Share failed'),
+        error?.message || t('common.tryAgain', 'Please try again')
+      );
+    }
+  };
+
   if (!userId) {
     return (
       <GradientBackground>
@@ -217,6 +230,14 @@ export default function ProfileScreen() {
                 >
                   <Globe size={20} color={colors.primary} />
                   <Text style={styles.actionButtonText}>{t('common.selectLanguage')}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={handleShareApp}
+                >
+                  <Share2 size={20} color={colors.primary} />
+                  <Text style={styles.actionButtonText}>{t('common.shareApp')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -305,40 +326,8 @@ export default function ProfileScreen() {
               <View style={styles.profileInfo}>
                 <Text style={styles.profileName}>{currentUser?.name || 'User'}</Text>
                 <Text style={styles.profileEmail}>{currentUser?.email || ''}</Text>
+                <Text style={styles.profilePhone}>{currentUser?.phone || t('common.notSet')}</Text>
               </View>
-            </View>
-
-            {/* Profile Information Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{t('common.profileInformation')}</Text>
-              
-              <View style={styles.infoRow}>
-                <Mail size={20} color={colors.textMuted} />
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>{t('common.email')}</Text>
-                  <Text style={styles.infoValue}>{currentUser?.email || 'N/A'}</Text>
-                </View>
-              </View>
-
-              <View style={styles.infoRow}>
-                <Phone size={20} color={colors.textMuted} />
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>{t('common.phone')}</Text>
-                  <Text style={styles.infoValue}>{currentUser?.phone || t('common.notSet')}</Text>
-                </View>
-              </View>
-
-              {/* <View style={styles.infoRow}>
-                <Lock size={20} color={colors.textMuted} />
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Authentication</Text>
-                  <Text style={styles.infoValue}>
-                    {canUseGoogle && canUsePassword ? 'Google & Password' : 
-                     canUseGoogle ? 'Google' : 
-                     canUsePassword ? 'Password' : 'N/A'}
-                  </Text>
-                </View>
-              </View> */}
             </View>
 
             {/* Action Buttons */}
@@ -387,6 +376,16 @@ export default function ProfileScreen() {
                   <Text style={styles.actionButtonText}>{t('common.changePassword')}</Text>
                 </TouchableOpacity>
               )}
+
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleShareApp}
+              >
+                <Share2 size={20} color={colors.primary} />
+                <Text style={styles.actionButtonText}>
+                  {t('common.shareApp', 'Share App')}
+                </Text>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.actionButton}
@@ -461,16 +460,13 @@ export default function ProfileScreen() {
 
                   <View style={styles.inputContainer}>
                     <Text style={styles.inputLabel}>{t('common.phone')}</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder={t('common.enterYourPhoneNumber')}
-                      placeholderTextColor={colors.textMuted}
+                    <PhoneNumberInput
                       value={editForm.phone}
-                      onChangeText={(value) => {
+                      onChange={(value) => {
                         setEditForm({ ...editForm, phone: value });
                         setEditErrors((prev) => ({ ...prev, phone: '' }));
                       }}
-                      keyboardType="phone-pad"
+                      placeholder={t('common.enterYourPhoneNumber')}
                     />
                     {editErrors.phone ? <Text style={styles.errorText}>{editErrors.phone}</Text> : null}
                   </View>
@@ -698,34 +694,11 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontSize: typography.fontSize.base,
     fontFamily: typography.fontFamily.regular,
   },
-  section: {
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    color: colors.text,
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semiBold,
-    marginBottom: 16,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-    gap: 12,
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoLabel: {
+  profilePhone: {
     color: colors.textMuted,
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.regular,
-    marginBottom: 4,
-  },
-  infoValue: {
-    color: colors.text,
     fontSize: typography.fontSize.base,
     fontFamily: typography.fontFamily.regular,
+    marginTop: 2,
   },
   actionsSection: {
     gap: 12,

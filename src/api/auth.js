@@ -435,6 +435,54 @@ const authAPI = {
       throw error;
     }
   },
+
+  /**
+   * Forgot Password - Send OTP
+   * POST /auth/customer/forgot-password/send-otp
+   */
+  sendForgotPasswordOTP: async (email) => {
+    try {
+      const response = await api.post('/auth/customer/forgot-password/send-otp', {
+        email: email.trim(),
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Forgot Password - Verify OTP
+   * POST /auth/customer/forgot-password/verify-otp
+   */
+  verifyForgotPasswordOTP: async (email, otp) => {
+    try {
+      const response = await api.post('/auth/customer/forgot-password/verify-otp', {
+        email: email.trim(),
+        otp: String(otp).trim(),
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Forgot Password - Reset Password
+   * POST /auth/customer/forgot-password/reset
+   */
+  resetForgotPassword: async (email, otp, password) => {
+    try {
+      const response = await api.post('/auth/customer/forgot-password/reset', {
+        email: email.trim(),
+        otp: String(otp).trim(),
+        password,
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
 };
 
 export default authAPI;

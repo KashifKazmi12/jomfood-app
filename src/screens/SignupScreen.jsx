@@ -4,7 +4,7 @@
  * CONCEPTS EXPLAINED:
  * 1. Multiple Form Fields: Managing multiple input states
  * 2. Form Object: Using single object for form state (cleaner)
- * 3. Optional Fields: Phone is required (mandatory validation)
+ * 3. Optional Fields: Phone is optional at signup
  * 4. Navigation: Navigate to Login after successful signup
  * 
  * Based on your web app SignupPage component
@@ -38,6 +38,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
 import { updateFCMTokenWithCustomerId } from '../utils/initializeNotifications';
 import { useQueryClient } from '@tanstack/react-query';
+import PhoneNumberInput from '../components/common/PhoneNumberInput';
 
 export default function SignupScreen() {
   const navigation = useNavigation();
@@ -86,8 +87,8 @@ export default function SignupScreen() {
    */
   const handleSubmit = async () => {
     // Validation
-    if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
-      showToast.error(t('common.error'), t('common.nameEmailPhoneRequired'));
+    if (!form.name.trim() || !form.email.trim()) {
+      showToast.error(t('common.error'), t('common.nameEmailRequired'));
       return;
     }
 
@@ -101,12 +102,13 @@ export default function SignupScreen() {
     dispatch(setLoading(true));
 
     try {
+      const trimmedPhone = form.phone.trim();
       // Call signup API
       // Call signup API (password will be set after email verification)
       const response = await authAPI.signup({
         name: form.name.trim(),
         email: form.email.trim(),
-        phone: form.phone.trim(),
+        phone: trimmedPhone || undefined,
       });
 
       // CHECK FOR VERIFICATION REQUIREMENT
@@ -362,16 +364,11 @@ export default function SignupScreen() {
 
           {/* Phone Input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>{t('signup.phone')}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={t('signup.phonePlaceholder')}
-              placeholderTextColor={colors.textMuted}
+            <Text style={styles.label}>{t('signup.phoneOptional')}</Text>
+            <PhoneNumberInput
               value={form.phone}
-              onChangeText={(value) => handleChange('phone', value)}
-              keyboardType="phone-pad"
-              returnKeyType="done"
-              onSubmitEditing={handleSubmit}
+              onChange={(value) => handleChange('phone', value)}
+              placeholder={t('signup.phonePlaceholder')}
               editable={!isSubmittingForm && !isSubmittingGoogle}
             />
           </View>
@@ -493,16 +490,13 @@ export default function SignupScreen() {
             <Text style={styles.phoneModalTitle}>{t('common.addPhoneTitle')}</Text>
             <Text style={styles.phoneModalSubtitle}>{t('common.addPhoneSubtitle')}</Text>
 
-            <TextInput
-              style={styles.phoneInputModal}
-              placeholder={t('common.enterYourPhoneNumber')}
-              placeholderTextColor={colors.textMuted}
+            <PhoneNumberInput
               value={phoneInput}
-              onChangeText={(value) => {
+              onChange={(value) => {
                 setPhoneInput(value);
                 setPhoneError('');
               }}
-              keyboardType="phone-pad"
+              placeholder={t('common.enterYourPhoneNumber')}
             />
             {phoneError ? <Text style={styles.phoneError}>{phoneError}</Text> : null}
 

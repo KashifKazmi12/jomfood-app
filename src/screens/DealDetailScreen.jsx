@@ -20,6 +20,7 @@ import Svg, { Path } from 'react-native-svg';
 import { BottomNavigationSpace } from '../navigation/AppNavigator';
 import { useCart } from '../context/CartContext';
 import ShareDealModal from '../components/deals/ShareDealModal';
+import PhoneNumberInput from '../components/common/PhoneNumberInput';
 
 // if (fullDeal.max_quantity === 1) {
 //   return 'One-time use only';
@@ -1086,16 +1087,13 @@ console.log('Company is:', company)
             <Text style={styles.phoneModalTitle}>{t('common.addPhoneTitle')}</Text>
             <Text style={styles.phoneModalSubtitle}>{t('common.addPhoneSubtitle')}</Text>
 
-            <TextInput
-              style={styles.phoneInput}
-              placeholder={t('common.enterYourPhoneNumber')}
-              placeholderTextColor={colors.textMuted}
+            <PhoneNumberInput
               value={phoneInput}
-              onChangeText={(value) => {
+              onChange={(value) => {
                 setPhoneInput(value);
                 setPhoneError('');
               }}
-              keyboardType="phone-pad"
+              placeholder={t('common.enterYourPhoneNumber')}
             />
             {phoneError ? <Text style={styles.phoneError}>{phoneError}</Text> : null}
 

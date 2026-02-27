@@ -62,7 +62,7 @@
     "nameRequired": "Name is required",
     "phoneRequired": "Phone is required",
     "addPhoneTitle": "Add your phone number",
-    "addPhoneSubtitle": "Please add your phone number for deal claims and checkout. You can skip for now.",
+    "addPhoneSubtitle": "Please enter your phone number.",
     "doItLater": "Do it later",
     "allPasswordFieldsRequired": "All password fields are required",
     "passwordMinLength": "New password must be at least 6 characters",

@@ -191,9 +191,9 @@ function DealGridCard({ deal, onView, onQuickClaim }) {
         >
           <Share2 size={14} color={colors.textMuted} />
         </TouchableOpacity>
-        <View style={styles.dealTypeBadge}>
+        {/* <View style={styles.dealTypeBadge}>
           <Text style={styles.dealTypeBadgeText}>{discountText}</Text>
-        </View>
+        </View> */}
       </View>
       <ShareDealModal
         visible={shareVisible}

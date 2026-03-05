@@ -587,9 +587,9 @@ console.log('Company is:', company)
           {/* Title Row with Badge and Heart */}
           <View style={styles.titleRow}>
             <Text style={styles.title}>{name}</Text>
-            <View style={styles.saveBadge}>
+            {/* <View style={styles.saveBadge}>
               <Text style={styles.saveBadgeText}>{discountText}</Text>
-            </View>
+            </View> */}
             <TouchableOpacity
               style={styles.shareButton}
               onPress={() => setShareVisible(true)}

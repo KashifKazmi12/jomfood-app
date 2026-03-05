@@ -347,9 +347,9 @@ const DealCard = React.memo(function DealCard({ deal, onView, onQuickClaim, colo
         >
         <Share2 size={14} color={colors.textMuted} />
         </TouchableOpacity>
-        <View style={styles.dealTypeBadge}>
+        {/* <View style={styles.dealTypeBadge}>
           <Text style={styles.dealTypeBadgeText}>{discountText}</Text>
-        </View>
+        </View> */}
       </View>
       <ShareDealModal
         visible={shareVisible}

@@ -43,7 +43,7 @@ function DealCard({ deal, onView, onQuickClaim }) {
         <View style={styles.row}>
           {price != null && <Text style={styles.price}>${price.toFixed(2)}</Text>}
           {original != null && <Text style={styles.original}>${original.toFixed(2)}</Text>}
-          {discountPct != null && <Text style={styles.badge}>-{discountPct}%</Text>}
+          {/* {discountPct != null && <Text style={styles.badge}>-{discountPct}%</Text>} */}
         </View>
         <View style={styles.ctaRow}>
           <TouchableOpacity style={styles.viewBtn} onPress={onView}>

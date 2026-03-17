@@ -71,6 +71,8 @@ export default function DealDetailScreen() {
   const longitude = deal?.business_id?.lng || '';
   const original = deal?.original_total ?? null;
   const price = deal?.deal_total ?? null;
+  const savingsAmount =
+    original != null && price != null && original > price ? original - price : 0;
   const discountPct = deal?.discount_percentage ?? null;
   const maxQuantity = deal?.max_quantity ?? null;
   const maxQuantityText = maxQuantity === 1 ? 'One-time use only' : maxQuantity === 2 ? 'Can be used twice' : `Can be used up to ${maxQuantity} times`;
@@ -821,13 +823,13 @@ console.log('Company is:', company)
                     <Text style={styles.pricingValueMuted}>RM{original.toFixed(2)}</Text>
                   </View>
                 )}
-                {deal?.discount_amount != null && (
+                {original != null && price != null && original > price && (
                   <View style={styles.pricingRow}>
                     <View style={styles.pricingLabelWithBadge}>
                       <Text style={styles.pricingLabelText}>You Save:</Text>
                     </View>
                     <Text style={[styles.pricingValueDiscount, { color: '#27AE60' }]}>
-                      -RM{deal.discount_amount.toFixed(2)}
+                      -RM{savingsAmount.toFixed(2)}
                     </Text>
                   </View>
                 )}

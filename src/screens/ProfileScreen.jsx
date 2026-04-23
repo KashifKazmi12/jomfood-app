@@ -33,6 +33,7 @@ import { removeCustomerIdFromFCMToken } from '../utils/initializeNotifications';
 import PhoneNumberInput from '../components/common/PhoneNumberInput';
 
 export default function ProfileScreen() {
+  const APP_STORE_URL = 'https://apps.apple.com/us/app/jomfood/id6757225361';
   const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.jomfood';
   const user = useSelector(state => state.auth.user);
   const { t } = useTranslation();
@@ -203,8 +204,9 @@ export default function ProfileScreen() {
 
   const handleShareApp = async () => {
     try {
+      const storeUrl = Platform.OS === 'ios' ? APP_STORE_URL : PLAY_STORE_URL;
       await Share.share({
-        message: `${t('common.shareAppMessage', 'Download JomFood app from Google Play:')} ${PLAY_STORE_URL}`,
+        message: `${t('common.shareAppMessage', 'Download JomFood app:')} ${storeUrl}`,
       });
     } catch (error) {
       showToast.error(

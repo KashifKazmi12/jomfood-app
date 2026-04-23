@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  TextInput,
   Platform,
   ScrollView,
   StyleSheet,
@@ -39,6 +40,9 @@ export default function CartScreen() {
   const [preferredTimeValue, setPreferredTimeValue] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [showIosPicker, setShowIosPicker] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [couponPreview, setCouponPreview] = useState(null);
+  const [couponLoading, setCouponLoading] = useState(false);
 
   const availableServiceTypes = useMemo(() => {
     if (!items.length) return [];
@@ -162,6 +166,40 @@ export default function CartScreen() {
     }
   }, [preferredServiceType]);
 
+  const fetchCouponPreview = useCallback(async (code = null, showError = false) => {
+    if (!user?._id || !items.length) {
+      setCouponPreview(null);
+      return null;
+    }
+    try {
+      setCouponLoading(true);
+      const response = await cartAPI.couponPreview(user._id, code || null);
+      const data = response?.data?.data || response?.data || null;
+      setCouponPreview(data);
+      if (showError && data?.manual_coupon_error) {
+        showToast.error('Error', data.manual_coupon_error);
+      }
+      return data;
+    } catch (error) {
+      if (showError) {
+        showToast.error('Error', error?.response?.data?.message || error?.message || 'Invalid coupon');
+      }
+      setCouponPreview(null);
+      return null;
+    } finally {
+      setCouponLoading(false);
+    }
+  }, [items.length, user?._id]);
+
+  useEffect(() => {
+    if (!user?._id || !items.length) {
+      setCouponPreview(null);
+      setCouponCode('');
+      return;
+    }
+    fetchCouponPreview(null);
+  }, [fetchCouponPreview, items.length, user?._id]);
+
   const handleCheckout = useCallback(async () => {
     if (!items.length) return;
     if (!user?._id) {
@@ -194,7 +232,10 @@ export default function CartScreen() {
       const response = await cartAPI.checkoutCart(
         user._id,
         preferredServiceType ? serviceTypeMap[preferredServiceType] : null,
-        preferredDatetime
+        preferredDatetime,
+        couponPreview?.applied_coupon?.source === 'manual'
+          ? couponPreview?.applied_coupon?.coupon_code
+          : null
       );
 
       const payload = response?.data?.data || response?.data || response || {};
@@ -308,6 +349,42 @@ export default function CartScreen() {
                 </View>
 
                 <View style={styles.preferences}>
+                  {couponPreview?.applied_coupon?.source === 'first_time' ? (
+                    <View style={styles.firstTimeBanner}>
+                      <Text style={styles.firstTimeBannerText}>
+                        {couponPreview?.first_time_message || 'Congratulations! First-time discount applied.'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.couponWrap}>
+                      <Text style={styles.sectionLabel}>{t('cart.couponCode', 'Coupon Code')}</Text>
+                      <View style={styles.couponRow}>
+                        <TextInput
+                          value={couponCode}
+                          onChangeText={(text) => setCouponCode((text || '').toUpperCase())}
+                          placeholder={t('cart.enterCouponCode', 'Enter coupon code')}
+                          placeholderTextColor={colors.textMuted}
+                          autoCapitalize="characters"
+                          style={styles.couponInput}
+                        />
+                        <TouchableOpacity
+                          style={[styles.couponApplyButton, (couponLoading || !couponCode.trim()) && styles.checkoutButtonDisabled]}
+                          disabled={couponLoading || !couponCode.trim()}
+                          onPress={() => fetchCouponPreview(couponCode, true)}
+                        >
+                          <Text style={styles.couponApplyButtonText}>
+                            {couponLoading ? '...' : t('cart.applyCoupon', 'Apply')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      {couponPreview?.applied_coupon?.source === 'manual' ? (
+                        <Text style={styles.couponAppliedText}>
+                          {t('cart.couponApplied', 'Coupon applied')}: {couponPreview.applied_coupon.coupon_code}
+                        </Text>
+                      ) : null}
+                    </View>
+                  )}
+
                   <Text style={styles.sectionTitle}>{t('cart.preferences', 'Preferences')}</Text>
                   <View style={styles.serviceTypeRow}>
                     {availableServiceTypes.map((type) => {
@@ -382,7 +459,24 @@ export default function CartScreen() {
                 <View style={styles.summary}>
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>{t('cart.subtotal', 'Subtotal')}</Text>
-                    <Text style={styles.summaryValue}>{formatCurrency(totals.total)}</Text>
+                    <Text style={styles.summaryValue}>
+                      {formatCurrency(couponPreview?.subtotal_amount ?? totals.total)}
+                    </Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabelRed}>{t('cart.couponDiscount', 'Coupon Discount')}</Text>
+                    <Text style={styles.summaryValueRed}>
+                      - {formatCurrency(couponPreview?.coupon_discount_amount ?? 0)}
+                    </Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabelTotal}>{t('cart.total', 'Total')}</Text>
+                    <Text style={styles.summaryValueTotal}>
+                      {formatCurrency(
+                        couponPreview?.total_after_coupon ??
+                        ((couponPreview?.subtotal_amount ?? totals.total) - (couponPreview?.coupon_discount_amount ?? 0))
+                      )}
+                    </Text>
                   </View>
                   <TouchableOpacity
                     style={[styles.checkoutButton, submitting && styles.checkoutButtonDisabled]}
@@ -524,6 +618,60 @@ const getStyles = (colors, typography) => StyleSheet.create({
     borderColor: colors.border,
     gap: 10,
   },
+  couponWrap: {
+    gap: 8,
+  },
+  couponRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  couponInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: typography.fontSize.sm,
+    color: colors.text,
+    fontFamily: typography.fontFamily.medium,
+    backgroundColor: colors.backgroundLight,
+  },
+  couponApplyButton: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLighter,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 70,
+  },
+  couponApplyButtonText: {
+    color: colors.primary,
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.semiBold,
+  },
+  couponAppliedText: {
+    fontSize: typography.fontSize.xs,
+    color: '#16a34a',
+    fontFamily: typography.fontFamily.medium,
+  },
+  firstTimeBanner: {
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    backgroundColor: '#f0fdf4',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  firstTimeBannerText: {
+    color: '#15803d',
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.medium,
+  },
   sectionTitle: {
     fontSize: typography.fontSize.sm,
     color: colors.text,
@@ -628,10 +776,30 @@ const getStyles = (colors, typography) => StyleSheet.create({
     color: colors.textMuted,
     fontFamily: typography.fontFamily.regular,
   },
+  summaryLabelRed: {
+    fontSize: typography.fontSize.sm,
+    color: '#dc2626',
+    fontFamily: typography.fontFamily.medium,
+  },
+  summaryLabelTotal: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text,
+    fontFamily: typography.fontFamily.semiBold,
+  },
   summaryValue: {
     fontSize: typography.fontSize.md,
     color: colors.text,
     fontFamily: typography.fontFamily.semiBold,
+  },
+  summaryValueRed: {
+    fontSize: typography.fontSize.md,
+    color: '#dc2626',
+    fontFamily: typography.fontFamily.semiBold,
+  },
+  summaryValueTotal: {
+    fontSize: typography.fontSize.md,
+    color: colors.text,
+    fontFamily: typography.fontFamily.bold || typography.fontFamily.semiBold,
   },
   checkoutButton: {
     backgroundColor: colors.primary,

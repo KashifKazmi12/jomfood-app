@@ -23,11 +23,18 @@ export const cartAPI = {
   clearCart: async (customerId) => {
     return api.post('/jomfood-deals/cart/clear', { customer_id: customerId });
   },
-  checkoutCart: async (customerId, preferredServiceType, preferredDatetime) => {
+  couponPreview: async (customerId, couponCode = null) => {
+    return api.post('/jomfood-deals/cart/coupon-preview', {
+      customer_id: customerId,
+      coupon_code: couponCode,
+    });
+  },
+  checkoutCart: async (customerId, preferredServiceType, preferredDatetime, couponCode = null) => {
     return api.post('/jomfood-deals/cart/checkout', {
       customer_id: customerId,
       preferred_service_type: preferredServiceType,
       preferred_datetime: preferredDatetime,
+      coupon_code: couponCode,
     });
   },
   getCartPaymentStatus: async (paymentId) => {

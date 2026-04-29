@@ -73,7 +73,16 @@ export default function SetPasswordScreen() {
 
             navigation.reset({
                 index: 0,
-                routes: [{ name: 'RootTabs' }],
+                routes: [{
+                    name: 'RootTabs',
+                    params: {
+                        screen: 'Home',
+                        params: {
+                            screen: 'HomeMain',
+                            params: { showFirstOrderDiscountModal: true },
+                        },
+                    },
+                }],
             });
         } catch (error) {
             dispatch(setLoading(false));

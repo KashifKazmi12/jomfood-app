@@ -26,7 +26,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Pressable } from 'react-native';
 import HomeDealsGridSection from '../components/deals/HomeDealsGridSection';
@@ -47,9 +47,11 @@ import { BottomNavigationSpace } from '../navigation/AppNavigator';
 import { useTranslation } from 'react-i18next';
 import { showToast } from '../components/toast';
 import { useCart } from '../context/CartContext';
+import FirstOrderDiscountModal from '../components/common/FirstOrderDiscountModal';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
   const { t } = useTranslation();
   const user = useSelector(state => state.auth.user);
   const dispatch = useDispatch();
@@ -112,6 +114,20 @@ export default function HomeScreen() {
   const [tempFilters, setTempFilters] = React.useState(filters);
   const [availableTags, setAvailableTags] = React.useState([]);
   const [loadingTags, setLoadingTags] = React.useState(false);
+  const [showFirstOrderDiscountModal, setShowFirstOrderDiscountModal] = React.useState(false);
+
+  React.useEffect(() => {
+    if (route.params?.showFirstOrderDiscountModal) {
+      setShowFirstOrderDiscountModal(true);
+    }
+  }, [route.params?.showFirstOrderDiscountModal]);
+
+  const handleCloseFirstOrderDiscountModal = React.useCallback(() => {
+    setShowFirstOrderDiscountModal(false);
+    if (route.params?.showFirstOrderDiscountModal) {
+      navigation.setParams({ showFirstOrderDiscountModal: undefined });
+    }
+  }, [navigation, route.params?.showFirstOrderDiscountModal]);
 
   // Debug log for location
   // React.useEffect(() => {
@@ -709,6 +725,11 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
+
+      <FirstOrderDiscountModal
+        visible={showFirstOrderDiscountModal}
+        onClose={handleCloseFirstOrderDiscountModal}
+      />
 
     </GradientBackground>
   );

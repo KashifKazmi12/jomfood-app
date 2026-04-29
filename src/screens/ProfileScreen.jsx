@@ -431,6 +431,7 @@ export default function ProfileScreen() {
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.modalContainer}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
           >
             <TouchableWithoutFeedback onPress={() => setEditProfileVisible(false)}>
               <View style={styles.modalBackdrop} />
@@ -510,6 +511,7 @@ export default function ProfileScreen() {
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.modalContainer}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
           >
             <TouchableWithoutFeedback onPress={() => setChangePasswordVisible(false)}>
               <View style={styles.modalBackdrop} />
@@ -736,16 +738,13 @@ const getStyles = (colors, typography) => StyleSheet.create({
   // Modal Styles
   modalContainer: {
     flex: 1,
+    justifyContent: 'flex-end',
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,

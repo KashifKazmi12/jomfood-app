@@ -4,7 +4,7 @@
  * CONCEPTS EXPLAINED:
  * 1. Multiple Form Fields: Managing multiple input states
  * 2. Form Object: Using single object for form state (cleaner)
- * 3. Optional Fields: Phone is optional at signup
+ * 3. Required Fields: Phone is required at signup
  * 4. Navigation: Navigate to Login after successful signup
  * 
  * Based on your web app SignupPage component
@@ -87,8 +87,8 @@ export default function SignupScreen() {
    */
   const handleSubmit = async () => {
     // Validation
-    if (!form.name.trim() || !form.email.trim()) {
-      showToast.error(t('common.error'), t('common.nameEmailRequired'));
+    if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
+      showToast.error(t('common.error'), 'Name, email and phone are required.');
       return;
     }
 
@@ -364,7 +364,7 @@ export default function SignupScreen() {
 
           {/* Phone Input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>{t('signup.phoneOptional')}</Text>
+            <Text style={styles.label}>Phone Number</Text>
             <PhoneNumberInput
               value={form.phone}
               onChange={(value) => handleChange('phone', value)}

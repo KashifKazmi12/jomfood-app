@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import useThemeColors from '../../theme/useThemeColors';
 import { Share2 } from 'lucide-react-native';
 import ShareDealModal from './ShareDealModal';
+import { APP_WEB_BASE_URL } from '../../config/api';
 
 function getDealImage(deal) {
   const firstItem = Array.isArray(deal?.deal_items) && deal.deal_items.length > 0 ? deal.deal_items[0] : null;
@@ -24,7 +25,9 @@ function DealCard({ deal, onView, onQuickClaim }) {
   const price = deal?.deal_total ?? null;
   const discountPct = deal?.discount_percentage ?? null;
   const [shareVisible, setShareVisible] = React.useState(false);
-  const dealLink = deal?._id ? `https://jomfood.my/?dealId=${deal._id}&autoOpen=true` : 'https://jomfood.my';
+  const dealLink = deal?._id
+    ? `${APP_WEB_BASE_URL}/?dealId=${deal._id}&autoOpen=true`
+    : APP_WEB_BASE_URL;
   const shareMessage = `Hey! Check out this awesome deal I found for ${name} at ${company}! Check it out here: ${dealLink} Let's go together!`;
 
   return (

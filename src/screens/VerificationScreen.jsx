@@ -30,6 +30,9 @@ import useThemeTypography from '../theme/useThemeTypography';
 import { showToast } from '../components/toast';
 import { updateFCMTokenWithCustomerId } from '../utils/initializeNotifications';
 import Logo from '../components/Logo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const REFERRAL_SESSION_KEY = 'jf_signup_referral';
 
 export default function VerificationScreen() {
     const navigation = useNavigation();
@@ -41,7 +44,7 @@ export default function VerificationScreen() {
     const styles = getStyles(colors, typography);
 
     // Params
-    const { userId, email } = route.params || {};
+    const { userId } = route.params || {};
 
     // State
     const [otp, setOtp] = useState('');
@@ -95,6 +98,12 @@ export default function VerificationScreen() {
 
             if (user) {
                 dispatch(setLoading(false));
+
+                try {
+                    await AsyncStorage.removeItem(REFERRAL_SESSION_KEY);
+                } catch {
+                    /* ignore */
+                }
 
                 if (requiresPasswordSetup) {
                     showToast.success(t('common.success'), t('verification.emailVerifiedSetPassword'));

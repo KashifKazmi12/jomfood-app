@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
@@ -8,8 +8,23 @@ import Logo from './Logo';
 import NotificationBell from './NotificationBell';
 import useThemeColors from '../theme/useThemeColors';
 import useThemeTypography from '../theme/useThemeTypography';
-import { Image } from 'react-native';
 import { useCart } from '../context/CartContext';
+
+function headerAvatarInitials(user) {
+  const name = (user?.name || '').trim();
+  if (name) {
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  }
+  const email = (user?.email || '').trim();
+  if (email) {
+    return email.substring(0, 2).toUpperCase();
+  }
+  return 'G';
+}
 
 /**
  * HeaderWithLogo Component
@@ -62,13 +77,26 @@ function HeaderWithLogo({
     }
   }, [onLogoPress]);
 
+  const avatarUri = useMemo(() => {
+    const raw = user?.image || user?.profileImage || user?.profile_picture;
+    if (typeof raw !== 'string') return '';
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : '';
+  }, [user?.image, user?.profileImage, user?.profile_picture]);
+
   return (
     <View style={styles.topHeader}>
       {user ? (
         <TouchableOpacity style={styles.avatar} onPress={handleAvatarPress}>
-          <Text style={styles.avatarText}>
-            {((user?.name || user?.email || 'G').substring(0, 1) || 'G').toUpperCase()}
-          </Text>
+          {avatarUri ? (
+            <Image
+              source={{ uri: avatarUri }}
+              style={styles.avatarImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <Text style={styles.avatarText}>{headerAvatarInitials(user)}</Text>
+          )}
         </TouchableOpacity>
       ) : (
         <TouchableOpacity style={styles.loginPill} onPress={handleLoginPress}>
@@ -185,10 +213,18 @@ const getStyles = (colors, typography) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors.border, 
+    borderColor: colors.border,
+    overflow: 'hidden',
+    zIndex: 10,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     color: colors.primary,
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.semiBold,
   },
   loginPill: {
     // width: 64,

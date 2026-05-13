@@ -19,6 +19,7 @@
 import api from './client';
 import { authStorage } from '../utils/authStorage';
 import i18n from '../i18n/config';
+import API_CONFIG from '../config/api';
 
 const authAPI = {
   /**
@@ -108,6 +109,15 @@ const authAPI = {
         payload.phone = userData.phone.trim();
       }
 
+      if (userData.image && String(userData.image).trim()) {
+        payload.image = String(userData.image).trim();
+      }
+
+      const ref = userData.referral_code ?? userData.referralCode;
+      if (ref && String(ref).trim()) {
+        payload.referral_code = String(ref).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      }
+
       const response = await api.post('/auth/customer/register', payload);
       return response;
     } catch (error) {
@@ -135,9 +145,9 @@ const authAPI = {
    * 
    * TODO: Adjust endpoint and payload based on your Google OAuth API
    */
-  googleOAuth: async (userInfo) => {
+  googleOAuth: async (userInfo, referralCode) => {
     try {
-      const response = await api.post('/auth/customer/google', {
+      const body = {
         idToken: userInfo.idToken,
         email: userInfo.email,
         name: userInfo.name,
@@ -145,7 +155,12 @@ const authAPI = {
         given_name: userInfo.given_name,
         family_name: userInfo.family_name,
         is_mobile: true,
-      });
+      };
+      const ref = referralCode && String(referralCode).trim();
+      if (ref) {
+        body.referral_code = ref.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      }
+      const response = await api.post('/auth/customer/google', body);
 
       // API tokens can be at root or under data
       const accessToken = response?.data?.tokens?.access_token ?? response?.data?.token ?? response?.token;
@@ -193,6 +208,9 @@ const authAPI = {
           throw { ...error, message: 'Email verification failed' };
         case 'GOOGLE_ACCOUNT_CONFLICT':
           throw { ...error, message: 'This email is already linked to a different Google account.' };
+        case 'INVALID_REFERRAL_CODE':
+        case 'SELF_REFERRAL':
+          throw { ...error, message: error.message || 'Invalid referral code.' };
         case 'SERVER_ERROR':
           throw { ...error, message: 'Server error. Please try again later.' };
         default:
@@ -207,15 +225,20 @@ const authAPI = {
    * @param {Object} userInfo - Apple user info from Sign in with Apple
    * @returns {Promise<Object>} User data and tokens
    */
-  appleOAuth: async (userInfo) => {
+  appleOAuth: async (userInfo, referralCode) => {
     try {
-      const response = await api.post('/auth/customer/apple', {
+      const body = {
         identityToken: userInfo.identityToken,
         authorizationCode: userInfo.authorizationCode,
         email: userInfo.email,
         name: userInfo.name,
         is_mobile: true,
-      });
+      };
+      const ref = referralCode && String(referralCode).trim();
+      if (ref) {
+        body.referral_code = ref.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      }
+      const response = await api.post('/auth/customer/apple', body);
 
       const accessToken = response?.data?.tokens?.access_token ?? response?.data?.token ?? response?.token;
       const refreshToken = response?.data?.tokens?.refresh_token ?? response?.data?.refreshToken ?? response?.refreshToken;
@@ -255,6 +278,9 @@ const authAPI = {
           throw { ...error, message: 'Email is required. Please allow email sharing with Apple Sign-In.' };
         case 'APPLE_ACCOUNT_CONFLICT':
           throw { ...error, message: 'This email is already linked to a different Apple account.' };
+        case 'INVALID_REFERRAL_CODE':
+        case 'SELF_REFERRAL':
+          throw { ...error, message: error.message || 'Invalid referral code.' };
         case 'SERVER_ERROR':
           throw { ...error, message: 'Server error. Please try again later.' };
         default:
@@ -354,6 +380,35 @@ const authAPI = {
     } catch (error) {
       throw error;
     }
+  },
+
+  /**
+   * Upload image file (multipart) — returns public/signed URL for profile `image` field.
+   */
+  uploadImage: async ({ uri, type = 'image/jpeg', fileName = 'profile.jpg' }) => {
+    const form = new FormData();
+    form.append('image', { uri, type, name: fileName });
+    const token = await authStorage.getAccessToken();
+    const res = await fetch(`${API_CONFIG.BASE_URL}/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+    if (!res.ok) {
+      throw new Error(
+        typeof data?.message === 'string' ? data.message : `Upload failed (${res.status})`
+      );
+    }
+    if (!data?.url) {
+      throw new Error('Upload did not return a URL');
+    }
+    return data.url;
   },
 
   /**

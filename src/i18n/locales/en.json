@@ -360,6 +360,10 @@
     "pullToRefresh": "Pull to refresh",
     "allRead": "All notifications read"
   },
+  "referral": {
+    "shareTitle": "Sign up with JomFood",
+    "shareInviteFull": "Hey! Sign up with JomFood and order the best deal for you. Please use this referral code: {{code}}\n\n{{url}}"
+  },
   "privacyPolicy": {
     "title": "Privacy Policy for jomfood.my",
     "lastUpdated": "Last updated",

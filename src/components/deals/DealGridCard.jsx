@@ -8,6 +8,7 @@ import { formatCurrency } from '../../utils/formatCurrency';
 import { openWhatsApp } from '../../utils/whatsapp';
 import { showToast } from '../toast';
 import ShareDealModal from './ShareDealModal';
+import { APP_WEB_BASE_URL } from '../../config/api';
 
 function DealGridCard({ deal, onView, onQuickClaim }) {
   const { t } = useTranslation();
@@ -33,7 +34,9 @@ function DealGridCard({ deal, onView, onQuickClaim }) {
   const officePhone = deal?.business_id?.office_phone || '';
   const [shareVisible, setShareVisible] = React.useState(false);
 
-  const dealLink = deal?._id ? `https://jomfood.my/?dealId=${deal._id}&autoOpen=true` : 'https://jomfood.my';
+  const dealLink = deal?._id
+    ? `${APP_WEB_BASE_URL}/?dealId=${deal._id}&autoOpen=true`
+    : APP_WEB_BASE_URL;
   const shareMessage = `Hey! Check out this awesome deal I found for ${name} at ${company}! Check it out here: ${dealLink} Let's go together!`;
 
   const handleWhatsAppPress = useCallback(async (e) => {

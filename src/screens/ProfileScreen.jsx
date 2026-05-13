@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
-  TextInput, 
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
   ActivityIndicator,
   Image,
   Modal,
@@ -25,12 +25,23 @@ import authAPI from '../api/auth';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import GradientBackground from '../components/GradientBackground';
 import { showToast } from '../components/toast';
-import { Phone, Lock, Edit2, X, Save, LogOut, Bell, Globe, Share2 } from 'lucide-react-native';
+import { Lock, Edit2, X, Save, LogOut, Bell, Globe, Share2, Camera, Copy, Link2 } from 'lucide-react-native';
 import useLanguage from '../i18n/useLanguage';
 import LoginPrompt from '../components/LoginPrompt';
 import { useTranslation } from 'react-i18next';
 import { removeCustomerIdFromFCMToken } from '../utils/initializeNotifications';
+import { launchImageLibrary } from 'react-native-image-picker';
 import PhoneNumberInput from '../components/common/PhoneNumberInput';
+import Clipboard from '@react-native-clipboard/clipboard';
+import { buildSignupInviteUrl } from '../config/referralInvite';
+
+function profileDisplayInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/);
+  const a = parts[0]?.[0] || '';
+  const b = parts.length > 1 ? parts[parts.length - 1][0] : parts[0]?.[1] || '';
+  const s = `${a}${b}`.toUpperCase();
+  return s || '?';
+}
 
 export default function ProfileScreen() {
   const APP_STORE_URL = 'https://apps.apple.com/us/app/jomfood/id6757225361';
@@ -50,10 +61,11 @@ export default function ProfileScreen() {
   const [editProfileVisible, setEditProfileVisible] = useState(false);
   const [changePasswordVisible, setChangePasswordVisible] = useState(false);
   const [editErrors, setEditErrors] = useState({ name: '', phone: '' });
-  
+
   // Form states
   const [editForm, setEditForm] = useState({ name: '', phone: '' });
   const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
+  const [avatarBusy, setAvatarBusy] = useState(false);
 
   // Fetch user profile data
   const { data: profileData, isLoading: isLoadingProfile, refetch: refetchProfile } = useQuery({
@@ -73,7 +85,7 @@ export default function ProfileScreen() {
         phone: profileData.phone || user?.phone || '',
       });
     }
-  }, [profileData]);
+  }, [profileData, user?.name, user?.phone]);
 
   // Edit profile mutation
   const editProfileMutation = useMutation({
@@ -111,8 +123,11 @@ export default function ProfileScreen() {
   // Get user ID and profile info
   const userId = user?._id;
   const currentUser = profileData || user;
+  const displayInitials = useMemo(
+    () => profileDisplayInitials(currentUser?.name),
+    [currentUser?.name]
+  );
   const canUsePassword = currentUser?.canUsePassword ?? false;
-  const canUseGoogle = currentUser?.canUseGoogle ?? false;
 
   // Force re-render when screen comes into focus (fixes Google Sign-In state sync issue)
   useFocusEffect(
@@ -122,7 +137,7 @@ export default function ProfileScreen() {
       if (userId) {
         refetchProfile();
       }
-    }, [user, userId, refetchProfile])
+    }, [userId, refetchProfile])
   );
 
   // Handle edit profile
@@ -166,6 +181,76 @@ export default function ProfileScreen() {
     });
   };
 
+  const pickProfilePhoto = () => {
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        selectionLimit: 1,
+        quality: 0.85,
+        maxWidth: 1600,
+        maxHeight: 1600,
+      },
+      async (response) => {
+        if (response.didCancel || response.errorCode) return;
+        const asset = response.assets?.[0];
+        if (!asset?.uri) return;
+        setAvatarBusy(true);
+        try {
+          const url = await authAPI.uploadImage({
+            uri: asset.uri,
+            type: asset.type || 'image/jpeg',
+            fileName: asset.fileName || 'profile.jpg',
+          });
+          const editRes = await authAPI.editProfile({ image: url });
+          if (editRes?.user) {
+            dispatch(updateUser(editRes.user));
+            queryClient.setQueryData(['user-profile'], editRes.user);
+          }
+          showToast.success(t('common.profileUpdated'), t('common.profileUpdatedSuccess'));
+        } catch (error) {
+          showToast.error(
+            t('common.updateFailed'),
+            error?.message || t('common.failedToUpdateProfile')
+          );
+        } finally {
+          setAvatarBusy(false);
+        }
+      }
+    );
+  };
+
+  const clearProfilePhoto = () => {
+    Alert.alert(
+      t('common.removePhoto', 'Remove photo?'),
+      t('common.removePhotoHint', 'Your initials will show until you add a new photo.'),
+      [
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+        {
+          text: t('common.remove', 'Remove'),
+          style: 'destructive',
+          onPress: async () => {
+            setAvatarBusy(true);
+            try {
+              const editRes = await authAPI.editProfile({ image: null });
+              if (editRes?.user) {
+                dispatch(updateUser(editRes.user));
+                queryClient.setQueryData(['user-profile'], editRes.user);
+              }
+              showToast.success(t('common.profileUpdated'), t('common.profileUpdatedSuccess'));
+            } catch (error) {
+              showToast.error(
+                t('common.updateFailed'),
+                error?.message || t('common.failedToUpdateProfile')
+              );
+            } finally {
+              setAvatarBusy(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleDeleteAccount = () => {
     Alert.alert(
       t('common.deleteAccountConfirmTitle', 'Delete account?'),
@@ -196,8 +281,8 @@ export default function ProfileScreen() {
                 error.message || t('common.failedToDeleteAccount', 'Failed to delete account')
               );
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
@@ -216,6 +301,52 @@ export default function ProfileScreen() {
     }
   };
 
+  const referralCode = currentUser?.referralCode || '';
+  const referralCount =
+    typeof currentUser?.referralCount === 'number' ? currentUser.referralCount : 0;
+  const inviteUrl = referralCode ? buildSignupInviteUrl(referralCode) : '';
+
+  const copyReferralCode = async () => {
+    if (!referralCode) return;
+    try {
+      await Clipboard.setString(referralCode);
+      showToast.success(t('common.success', 'Success'), t('referral.codeCopied', 'Referral code copied'));
+    } catch {
+      showToast.error(t('common.error', 'Error'), t('referral.copyFailed', 'Could not copy'));
+    }
+  };
+
+  const copyInviteLink = async () => {
+    if (!inviteUrl) return;
+    try {
+      await Clipboard.setString(inviteUrl);
+      showToast.success(t('common.success', 'Success'), t('referral.linkCopied', 'Invite link copied'));
+    } catch {
+      showToast.error(t('common.error', 'Error'), t('referral.copyFailed', 'Could not copy'));
+    }
+  };
+
+  const shareReferralInvite = async () => {
+    if (!inviteUrl) return;
+    try {
+      await Share.share({
+        title: t('referral.shareTitle', 'Sign up with JomFood'),
+        message: t('referral.shareInviteFull', 'Hey! Sign up with JomFood and order the best deal for you. Please use this referral code: {{code}}\n\n{{url}}', {
+          code: referralCode,
+          url: inviteUrl,
+        }),
+        url: inviteUrl,
+      });
+    } catch (error) {
+      if (error?.message && !String(error.message).toLowerCase().includes('cancel')) {
+        showToast.error(
+          t('common.shareFailed', 'Share failed'),
+          error?.message || t('common.tryAgain', 'Please try again')
+        );
+      }
+    }
+  };
+
   if (!userId) {
     return (
       <GradientBackground>
@@ -223,7 +354,7 @@ export default function ProfileScreen() {
           <ScrollView contentContainerStyle={styles.scrollContent}>
             <View style={styles.container}>
               <LoginPrompt message={t('common.pleaseSignIn')} />
-              
+
               {/* Language Switcher for non-logged in users */}
               <View style={styles.actionsSection}>
                 <TouchableOpacity
@@ -241,6 +372,17 @@ export default function ProfileScreen() {
                   <Share2 size={20} color={colors.primary} />
                   <Text style={styles.actionButtonText}>{t('common.shareApp')}</Text>
                 </TouchableOpacity>
+
+                {/* Test button to log env variables */}
+                {/* <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => {
+                    console.log('API_BASE_URL:', process.env.API_BASE_URL);
+                    console.log('WEB_BASE_URL:', process.env.WEB_BASE_URL);
+                  }}
+                >
+                  <Text style={styles.actionButtonText}>Log env variables</Text>
+                </TouchableOpacity> */}
               </View>
             </View>
           </ScrollView>
@@ -260,7 +402,7 @@ export default function ProfileScreen() {
           >
             <View style={styles.languageModalContent}>
               <Text style={styles.languageModalTitle}>{t('common.selectLanguage')}</Text>
-              
+
               {getLanguages().map((lang) => (
                 <TouchableOpacity
                   key={lang.code}
@@ -309,135 +451,208 @@ export default function ProfileScreen() {
   return (
     <GradientBackground>
       <SafeAreaView style={styles.safeContent} edges={['top']}>
-      <View style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.container}>
-            {/* Profile Header */}
-            <View style={styles.profileHeader}>
-              <View style={styles.avatarContainer}>
-                {currentUser?.image ? (
-                  <Image source={{ uri: currentUser.image }} style={styles.avatarImage} />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarText}>
-                      {(currentUser?.name || 'U').substring(0, 1).toUpperCase()}
-                    </Text>
-                  </View>
-                )}
+        <View style={styles.safe}>
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            <View style={styles.container}>
+              {/* Profile Header */}
+              <View style={styles.profileHeader}>
+                <TouchableOpacity
+                  style={styles.avatarWrapper}
+                  onPress={pickProfilePhoto}
+                  onLongPress={currentUser?.image ? clearProfilePhoto : undefined}
+                  disabled={avatarBusy}
+                  activeOpacity={0.88}
+                  delayLongPress={480}
+                  accessibilityLabel={t('common.changePhoto', 'Change profile photo')}
+                  accessibilityHint={
+                    currentUser?.image
+                      ? t('common.removePhotoHint', 'Long-press to remove photo')
+                      : undefined
+                  }
+                >
+                  {avatarBusy ? (
+                    <View style={[styles.avatarPlaceholder, styles.avatarBusyWrap]}>
+                      <ActivityIndicator color={colors.white} />
+                    </View>
+                  ) : currentUser?.image ? (
+                    <Image source={{ uri: currentUser.image }} style={styles.avatarImage} />
+                  ) : (
+                    <View style={styles.avatarPlaceholder}>
+                      <Text style={styles.avatarText}>{displayInitials}</Text>
+                    </View>
+                  )}
+                  {!avatarBusy && (
+                    <View style={styles.avatarCameraOverlay} pointerEvents="none">
+                      <Camera size={19} color="rgba(90, 90, 90, 0.34)" strokeWidth={1.65} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <View style={styles.profileInfo}>
+                  <Text style={styles.profileName}>{currentUser?.name || 'User'}</Text>
+                  <Text style={styles.profileEmail} numberOfLines={2}>
+                    {currentUser?.email || ''}
+                  </Text>
+                  <Text style={styles.profilePhone}>{currentUser?.phone || t('common.notSet')}</Text>
+                </View>
               </View>
-              <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>{currentUser?.name || 'User'}</Text>
-                <Text style={styles.profileEmail}>{currentUser?.email || ''}</Text>
-                <Text style={styles.profilePhone}>{currentUser?.phone || t('common.notSet')}</Text>
-              </View>
-            </View>
 
-            {/* Action Buttons */}
-            <View style={styles.actionsSection}>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => {
-                  setEditForm({
-                    name: currentUser?.name || '',
-                    phone: currentUser?.phone || '',
-                  });
-                  setEditProfileVisible(true);
-                }}
-              >
-                <Edit2 size={20} color={colors.primary} />
-                <Text style={styles.actionButtonText}>{t('common.editProfile')}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => setLanguageModalVisible(true)}
-              >
-                <Globe size={20} color={colors.primary} />
-                <Text style={styles.actionButtonText}>{t('common.selectLanguage')}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => {
-                  navigation.navigate('Notifications');
-                }}
-              >
-                <Bell size={20} color={colors.primary} />
-                <Text style={styles.actionButtonText}>{t('notifications.notifications')}</Text>
-              </TouchableOpacity>
-
-              {canUsePassword && (
+              {/* Edit profile first — primary action before referrals and other settings */}
+              <View style={styles.actionsSectionLead}>
                 <TouchableOpacity
                   style={styles.actionButton}
                   onPress={() => {
-                    setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
-                    setChangePasswordVisible(true);
+                    setEditForm({
+                      name: currentUser?.name || '',
+                      phone: currentUser?.phone || '',
+                    });
+                    setEditProfileVisible(true);
                   }}
                 >
-                  <Lock size={20} color={colors.primary} />
-                  <Text style={styles.actionButtonText}>{t('common.changePassword')}</Text>
+                  <Edit2 size={20} color={colors.primary} />
+                  <Text style={styles.actionButtonText}>{t('common.editProfile')}</Text>
                 </TouchableOpacity>
-              )}
+              </View>
 
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleShareApp}
-              >
-                <Share2 size={20} color={colors.primary} />
-                <Text style={styles.actionButtonText}>
-                  {t('common.shareApp', 'Share App')}
+              <View style={styles.referralCard}>
+                <Text style={styles.referralKicker}>{t('referral.sectionLabel', 'REFERRALS')}</Text>
+                <Text style={styles.referralTitle}>{t('referral.inviteFriends', 'Invite friends')}</Text>
+                <Text style={styles.referralDesc}>
+                  {t(
+                    'referral.description',
+                    'When someone signs up with your referral code, your referral count increases.'
+                  )}
                 </Text>
-              </TouchableOpacity>
+                <View style={styles.referralCodeRow}>
+                  <Text style={styles.referralCodeText} numberOfLines={1} selectable>
+                    {referralCode || '—'}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={copyReferralCode}
+                    disabled={!referralCode}
+                    style={[styles.referralIconBtn, !referralCode && styles.referralIconBtnDisabled]}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Copy size={18} color={referralCode ? colors.textMuted : colors.border} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.referralActions}>
+                  <TouchableOpacity
+                    style={[styles.referralSecondaryBtn, !inviteUrl && styles.referralBtnDisabled]}
+                    onPress={copyInviteLink}
+                    disabled={!inviteUrl}
+                  >
+                    <Link2 size={16} color={colors.text} />
+                    <Text style={styles.referralSecondaryBtnText}>{t('referral.copyLink', 'Copy link')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.referralPrimaryBtn, !inviteUrl && styles.referralBtnDisabled]}
+                    onPress={shareReferralInvite}
+                    disabled={!inviteUrl}
+                  >
+                    <Share2 size={16} color={colors.white} />
+                    <Text style={styles.referralPrimaryBtnText}>{t('common.share', 'Share')}</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.referralStatRow}>
+                  <Text style={styles.referralStatLabel}>
+                    {t('referral.successfulReferrals', 'Successful referrals')}
+                  </Text>
+                  <Text style={styles.referralStatValue}>{referralCount}</Text>
+                </View>
+              </View>
 
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleDeleteAccount}
-              >
-                <LogOut size={20} color={colors.textMuted} />
-                <Text style={styles.actionButtonText}>
-                  {t('common.deleteAccount', 'Delete Account')}
-                </Text>
-              </TouchableOpacity>
+              {/* Remaining settings & actions */}
+              <View style={styles.actionsSection}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => setLanguageModalVisible(true)}
+                >
+                  <Globe size={20} color={colors.primary} />
+                  <Text style={styles.actionButtonText}>{t('common.selectLanguage')}</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.actionButton, styles.logoutButton]}
-                onPress={async () => {
-                  // Remove customerId from FCM token before logout
-                  try {
-                    await removeCustomerIdFromFCMToken();
-                  } catch (error) {
-                    console.warn('⚠️ Failed to remove customerId from FCM token:', error);
-                  }
-                  
-                  await authAPI.logout();
-                  dispatch(clearUser());
-                  navigation.navigate('Home');
-                }}
-              >
-                <LogOut size={20} color={colors.white} />
-                <Text style={[styles.actionButtonText, styles.logoutButtonText]}>{t('common.logout')}</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => {
+                    navigation.navigate('Notifications');
+                  }}
+                >
+                  <Bell size={20} color={colors.primary} />
+                  <Text style={styles.actionButtonText}>{t('notifications.notifications')}</Text>
+                </TouchableOpacity>
+
+                {canUsePassword && (
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => {
+                      setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+                      setChangePasswordVisible(true);
+                    }}
+                  >
+                    <Lock size={20} color={colors.primary} />
+                    <Text style={styles.actionButtonText}>{t('common.changePassword')}</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={handleShareApp}
+                >
+                  <Share2 size={20} color={colors.primary} />
+                  <Text style={styles.actionButtonText}>
+                    {t('common.shareApp', 'Share App')}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={handleDeleteAccount}
+                >
+                  <LogOut size={20} color={colors.textMuted} />
+                  <Text style={styles.actionButtonText}>
+                    {t('common.deleteAccount', 'Delete Account')}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.logoutButton]}
+                  onPress={async () => {
+                    // Remove customerId from FCM token before logout
+                    try {
+                      await removeCustomerIdFromFCMToken();
+                    } catch (error) {
+                      console.warn('⚠️ Failed to remove customerId from FCM token:', error);
+                    }
+
+                    await authAPI.logout();
+                    dispatch(clearUser());
+                    navigation.navigate('Home');
+                  }}
+                >
+                  <LogOut size={20} color={colors.white} />
+                  <Text style={[styles.actionButtonText, styles.logoutButtonText]}>{t('common.logout')}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
 
-        {/* Edit Profile Modal */}
-        <Modal
-          visible={editProfileVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setEditProfileVisible(false)}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.modalContainer}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+          {/* Edit Profile Modal */}
+          <Modal
+            visible={editProfileVisible}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setEditProfileVisible(false)}
           >
-            <TouchableWithoutFeedback onPress={() => setEditProfileVisible(false)}>
-              <View style={styles.modalBackdrop} />
-            </TouchableWithoutFeedback>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.modalContainer}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+            >
+              <TouchableWithoutFeedback onPress={() => setEditProfileVisible(false)}>
+                <View style={styles.modalBackdrop} />
+              </TouchableWithoutFeedback>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>{t('common.editProfile')}</Text>
                   <TouchableOpacity onPress={() => setEditProfileVisible(false)}>
                     <X size={24} color={colors.text} />
@@ -497,27 +712,27 @@ export default function ProfileScreen() {
                     )}
                   </TouchableOpacity>
                 </View>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
+              </View>
+            </KeyboardAvoidingView>
+          </Modal>
 
-        {/* Change Password Modal */}
-        <Modal
-          visible={changePasswordVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setChangePasswordVisible(false)}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.modalContainer}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+          {/* Change Password Modal */}
+          <Modal
+            visible={changePasswordVisible}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setChangePasswordVisible(false)}
           >
-            <TouchableWithoutFeedback onPress={() => setChangePasswordVisible(false)}>
-              <View style={styles.modalBackdrop} />
-            </TouchableWithoutFeedback>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.modalContainer}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+            >
+              <TouchableWithoutFeedback onPress={() => setChangePasswordVisible(false)}>
+                <View style={styles.modalBackdrop} />
+              </TouchableWithoutFeedback>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>{t('common.changePassword')}</Text>
                   <TouchableOpacity onPress={() => setChangePasswordVisible(false)}>
                     <X size={24} color={colors.text} />
@@ -584,70 +799,70 @@ export default function ProfileScreen() {
                     )}
                   </TouchableOpacity>
                 </View>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
+              </View>
+            </KeyboardAvoidingView>
+          </Modal>
 
-        {/* Language Selection Modal */}
-        <Modal
-          visible={languageModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setLanguageModalVisible(false)}
-        >
-          <TouchableOpacity
-            style={styles.languageModalOverlay}
-            activeOpacity={1}
-            onPress={() => setLanguageModalVisible(false)}
+          {/* Language Selection Modal */}
+          <Modal
+            visible={languageModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setLanguageModalVisible(false)}
           >
-            <View style={styles.languageModalContent}>
-              <Text style={styles.languageModalTitle}>{t('common.selectLanguage')}</Text>
-              
-              {getLanguages().map((lang) => (
-                <TouchableOpacity
-                  key={lang.code}
-                  style={[
-                    styles.languageOption,
-                    currentLanguage === lang.code && styles.languageOptionActive,
-                  ]}
-                  onPress={async () => {
-                    await changeLanguage(lang.code);
-                    setLanguageModalVisible(false);
-                  }}
-                >
-                  <Text style={styles.languageFlag}>{lang.flag}</Text>
-                  <Text
+            <TouchableOpacity
+              style={styles.languageModalOverlay}
+              activeOpacity={1}
+              onPress={() => setLanguageModalVisible(false)}
+            >
+              <View style={styles.languageModalContent}>
+                <Text style={styles.languageModalTitle}>{t('common.selectLanguage')}</Text>
+
+                {getLanguages().map((lang) => (
+                  <TouchableOpacity
+                    key={lang.code}
                     style={[
-                      styles.languageName,
-                      currentLanguage === lang.code && styles.languageNameActive,
+                      styles.languageOption,
+                      currentLanguage === lang.code && styles.languageOptionActive,
                     ]}
+                    onPress={async () => {
+                      await changeLanguage(lang.code);
+                      setLanguageModalVisible(false);
+                    }}
                   >
-                    {lang.name}
-                  </Text>
-                  {currentLanguage === lang.code && (
-                    <Text style={styles.languageCheckmark}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </TouchableOpacity>
-        </Modal>
-      </View>
+                    <Text style={styles.languageFlag}>{lang.flag}</Text>
+                    <Text
+                      style={[
+                        styles.languageName,
+                        currentLanguage === lang.code && styles.languageNameActive,
+                      ]}
+                    >
+                      {lang.name}
+                    </Text>
+                    {currentLanguage === lang.code && (
+                      <Text style={styles.languageCheckmark}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </TouchableOpacity>
+          </Modal>
+        </View>
       </SafeAreaView>
     </GradientBackground>
   );
 }
 
 const getStyles = (colors, typography) => StyleSheet.create({
-  safe: { 
-    flex: 1, 
-    backgroundColor: 'transparent' 
+  safe: {
+    flex: 1,
+    backgroundColor: 'transparent'
   },
   safeContent: { flex: 1, backgroundColor: 'transparent' },
   scrollContent: {
     paddingBottom: 100,
   },
-  container: { 
+  container: {
     padding: 20,
   },
   loadingContainer: {
@@ -664,29 +879,45 @@ const getStyles = (colors, typography) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  avatarContainer: {
+  avatarWrapper: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     marginRight: 16,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  avatarBusyWrap: {
+    justifyContent: 'center',
   },
   avatarPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 40,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     color: colors.white,
-    fontSize: typography.fontSize['2xl'],
+    fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily.semiBold,
   },
   avatarImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  avatarCameraOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
   },
   profileInfo: {
     flex: 1,
+    minWidth: 0,
+    paddingTop: 0,
   },
   profileName: {
     color: colors.text,
@@ -703,6 +934,129 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontSize: typography.fontSize.base,
     fontFamily: typography.fontFamily.regular,
     marginTop: 2,
+  },
+  referralCard: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  referralKicker: {
+    fontSize: 10,
+    fontFamily: typography.fontFamily.semiBold,
+    letterSpacing: 1.2,
+    color: colors.textMuted,
+    marginBottom: 4,
+  },
+  referralTitle: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.semiBold,
+    color: colors.text,
+    marginBottom: 6,
+  },
+  referralDesc: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textMuted,
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  referralCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: colors.backgroundLight,
+    marginBottom: 10,
+  },
+  referralCodeText: {
+    flex: 1,
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.semiBold,
+    color: colors.text,
+    letterSpacing: 0.5,
+  },
+  referralIconBtn: {
+    padding: 4,
+  },
+  referralIconBtnDisabled: {
+    opacity: 0.35,
+  },
+  referralActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 12,
+  },
+  referralSecondaryBtn: {
+    flex: 1,
+    minWidth: 120,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+  },
+  referralSecondaryBtnText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.text,
+  },
+  referralPrimaryBtn: {
+    flex: 1,
+    minWidth: 120,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
+  },
+  referralPrimaryBtnText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.white,
+  },
+  referralBtnDisabled: {
+    opacity: 0.4,
+  },
+  referralStatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 4,
+    paddingHorizontal: 4,
+  },
+  referralStatLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.regular,
+  },
+  referralStatValue: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.semiBold,
+    color: colors.text,
+  },
+  actionsSectionLead: {
+    gap: 12,
+    marginBottom: 12,
   },
   actionsSection: {
     gap: 12,
@@ -772,7 +1126,7 @@ const getStyles = (colors, typography) => StyleSheet.create({
   },
   modalBody: {
     padding: 20,
-  },  
+  },
   inputContainer: {
     marginBottom: 20,
   },
@@ -815,7 +1169,7 @@ const getStyles = (colors, typography) => StyleSheet.create({
   },
   cancelButtonText: {
     color: colors.text,
-    fontSize: typography.fontSize.base, 
+    fontSize: typography.fontSize.base,
     fontFamily: typography.fontFamily.regular,
   },
   saveButton: {

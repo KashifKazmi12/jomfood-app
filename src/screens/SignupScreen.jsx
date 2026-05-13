@@ -10,7 +10,7 @@
  * Based on your web app SignupPage component
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -26,7 +25,7 @@ import {
 } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { showToast } from '../components/toast';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { setUser, setLoading, updateUser } from '../store/slices/authSlice';
 import authAPI from '../api/auth';
 import useThemeColors from '../theme/useThemeColors';
@@ -39,9 +38,13 @@ import { useTranslation } from 'react-i18next';
 import { updateFCMTokenWithCustomerId } from '../utils/initializeNotifications';
 import { useQueryClient } from '@tanstack/react-query';
 import PhoneNumberInput from '../components/common/PhoneNumberInput';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const REFERRAL_SESSION_KEY = 'jf_signup_referral';
 
 export default function SignupScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -54,6 +57,7 @@ export default function SignupScreen() {
     name: '',
     email: '',
     phone: '',
+    referralCode: '',
   });
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   const [isSubmittingGoogle, setIsSubmittingGoogle] = useState(false);
@@ -67,12 +71,54 @@ export default function SignupScreen() {
   const [phoneSaving, setPhoneSaving] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState(null);
 
+  useEffect(() => {
+    const fromRoute = route.params?.ref;
+    if (fromRoute && String(fromRoute).trim()) {
+      const normalized = String(fromRoute)
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '');
+      if (normalized) {
+        AsyncStorage.setItem(REFERRAL_SESSION_KEY, normalized).catch(() => {});
+        setForm((prev) => ({ ...prev, referralCode: prev.referralCode || normalized }));
+      }
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem(REFERRAL_SESSION_KEY);
+        if (cancelled || !stored) return;
+        const normalized = stored.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (normalized) {
+          setForm((prev) => ({ ...prev, referralCode: prev.referralCode || normalized }));
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [route.params]);
+
   /**
    * Update form field value
    * CONCEPT: Generic handler for all inputs (DRY - Don't Repeat Yourself)
    */
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const getEffectiveReferralCode = async () => {
+    const fromForm = (form.referralCode || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (fromForm) return fromForm;
+    try {
+      const s = await AsyncStorage.getItem(REFERRAL_SESSION_KEY);
+      return (s || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '') || undefined;
+    } catch {
+      return undefined;
+    }
   };
 
   /**
@@ -103,13 +149,18 @@ export default function SignupScreen() {
 
     try {
       const trimmedPhone = form.phone.trim();
-      // Call signup API
-      // Call signup API (password will be set after email verification)
-      const response = await authAPI.signup({
+      const referralCode = await getEffectiveReferralCode();
+
+      const signupBody = {
         name: form.name.trim(),
         email: form.email.trim(),
         phone: trimmedPhone || undefined,
-      });
+      };
+      if (referralCode) {
+        signupBody.referral_code = referralCode;
+      }
+
+      const response = await authAPI.signup(signupBody);
 
       // CHECK FOR VERIFICATION REQUIREMENT
       if (response && response.data && response.data.verificationRequired) {
@@ -135,6 +186,12 @@ export default function SignupScreen() {
       navigation.replace('Login');
     } catch (error) {
       dispatch(setLoading(false));
+
+      const errCode = error?.error || error?.data?.error;
+      if (errCode === 'INVALID_REFERRAL_CODE' || errCode === 'SELF_REFERRAL') {
+        showToast.error(t('common.registrationFailed'), error.message || t('referral.invalidCode', 'Invalid referral code'));
+        return;
+      }
 
       // Show error message
       const errorMessage = error.message || t('common.registrationFailedMessage');
@@ -206,8 +263,14 @@ export default function SignupScreen() {
       // Get Google user info and ID token
       const googleUserInfo = await signInWithGoogle();
 
-      // Call backend API with Google credentials
-      const response = await authAPI.googleOAuth(googleUserInfo);
+      const referralCode = await getEffectiveReferralCode();
+      const response = await authAPI.googleOAuth(googleUserInfo, referralCode);
+
+      try {
+        await AsyncStorage.removeItem(REFERRAL_SESSION_KEY);
+      } catch {
+        /* ignore */
+      }
 
       // Update Redux with user data
       if (response.user) {
@@ -218,7 +281,7 @@ export default function SignupScreen() {
         if (response.user._id) {
           try {
             // console.log('🔄 [SignupScreen] Updating FCM token with customerId (Google):', response.user._id);
-            const fcmResult = await updateFCMTokenWithCustomerId(response.user._id);
+            await updateFCMTokenWithCustomerId(response.user._id);
             // if (fcmResult.success) {
             //   console.log('✅ [SignupScreen] FCM token updated successfully (Google)');
             // } else {
@@ -252,6 +315,12 @@ export default function SignupScreen() {
         return;
       }
 
+      const errCode = error?.error || error?.data?.error;
+      if (errCode === 'INVALID_REFERRAL_CODE' || errCode === 'SELF_REFERRAL') {
+        showToast.error(t('common.googleSignInFailed'), error.message || t('referral.invalidCode', 'Invalid referral code'));
+        return;
+      }
+
       // Show error message
       const errorMessage = error.message || t('common.failedToSignInWithGoogle');
       showToast.error(t('common.googleSignInFailed'), errorMessage);
@@ -268,7 +337,14 @@ export default function SignupScreen() {
 
     try {
       const appleUserInfo = await signInWithApple();
-      const response = await authAPI.appleOAuth(appleUserInfo);
+      const referralCode = await getEffectiveReferralCode();
+      const response = await authAPI.appleOAuth(appleUserInfo, referralCode);
+
+      try {
+        await AsyncStorage.removeItem(REFERRAL_SESSION_KEY);
+      } catch {
+        /* ignore */
+      }
 
       if (response.user) {
         dispatch(setUser(response.user));
@@ -296,6 +372,13 @@ export default function SignupScreen() {
     } catch (error) {
       dispatch(setLoading(false));
       if (error.cancelled) return;
+
+      const errCode = error?.error || error?.data?.error;
+      if (errCode === 'INVALID_REFERRAL_CODE' || errCode === 'SELF_REFERRAL') {
+        showToast.error(t('common.appleSignInFailed'), error.message || t('referral.invalidCode', 'Invalid referral code'));
+        return;
+      }
+
       const errorMessage = error.message || t('common.failedToSignInWithApple');
       showToast.error(t('common.appleSignInFailed'), errorMessage);
     } finally {
@@ -306,7 +389,7 @@ export default function SignupScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-      style={[styles.container, { flex: 1 }]}
+      style={styles.container}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       enabled
     >
@@ -316,8 +399,7 @@ export default function SignupScreen() {
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* Logo/Title Section */
-        }
+        {/* Logo/Title Section */}
         <View style={styles.header}>
           <Logo size={122} height={35.5} style={styles.logo} />
           <Text style={styles.welcomeText}>{t('signup.createYourAccount')}</Text>
@@ -371,6 +453,32 @@ export default function SignupScreen() {
               placeholder={t('signup.phonePlaceholder')}
               editable={!isSubmittingForm && !isSubmittingGoogle}
             />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>
+              {t('referral.codeLabel', 'Referral code')}{' '}
+              <Text style={styles.optionalMark}>{t('referral.optional', '(optional)')}</Text>
+            </Text>
+            <TextInput
+              style={[styles.input, styles.referralInput]}
+              placeholder="ABC12X"
+              placeholderTextColor={colors.textMuted}
+              value={form.referralCode}
+              onChangeText={(value) =>
+                setForm((prev) => ({
+                  ...prev,
+                  referralCode: value.toUpperCase().replace(/[^A-Z0-9]/g, ''),
+                }))
+              }
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={12}
+              editable={!isSubmittingForm && !isSubmittingGoogle}
+            />
+            <Text style={styles.referralHint}>
+              {t('referral.signupHint', 'Optional — paste an invite code or open the link you were sent.')}
+            </Text>
           </View>
 
           {/* Privacy Policy Checkbox */}
@@ -608,6 +716,22 @@ const getStyles = (colors, typography) => StyleSheet.create({
     color: colors.textMuted,
     fontFamily: typography.fontFamily.regular,
   },
+  optionalMark: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.regular,
+    fontSize: typography.fontSize.sm,
+  },
+  referralInput: {
+    fontFamily: typography.fontFamily.semiBold,
+    letterSpacing: 0.5,
+  },
+  referralHint: {
+    marginTop: 6,
+    fontSize: typography.fontSize.xs,
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.regular,
+    lineHeight: 16,
+  },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -643,11 +767,6 @@ const getStyles = (colors, typography) => StyleSheet.create({
     flex: 1,
     height: 1,
     backgroundColor: colors.border,
-  },
-  dividerText: {
-    marginHorizontal: 12,
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.regular,
   },
   dividerText: {
     marginHorizontal: 12,

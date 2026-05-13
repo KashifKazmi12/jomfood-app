@@ -21,6 +21,7 @@ import { BottomNavigationSpace } from '../navigation/AppNavigator';
 import { useCart } from '../context/CartContext';
 import ShareDealModal from '../components/deals/ShareDealModal';
 import PhoneNumberInput from '../components/common/PhoneNumberInput';
+import { APP_WEB_BASE_URL } from '../config/api';
 
 // if (fullDeal.max_quantity === 1) {
 //   return 'One-time use only';
@@ -77,7 +78,7 @@ export default function DealDetailScreen() {
   const maxQuantity = deal?.max_quantity ?? null;
   const maxQuantityText = maxQuantity === 1 ? 'One-time use only' : maxQuantity === 2 ? 'Can be used twice' : `Can be used up to ${maxQuantity} times`;
   const rating = Number(deal?.rating ?? 5);
-  const dealLink = id ? `https://jomfood.my/?dealId=${id}&autoOpen=true` : 'https://jomfood.my';
+  const dealLink = id ? `${APP_WEB_BASE_URL}/?dealId=${id}&autoOpen=true` : APP_WEB_BASE_URL;
   const shareMessage = `Hey! Check out this awesome deal I found for ${name} at ${company}! Check it out here: ${dealLink} Let's go together!`;
 console.log('Company is:', company)
 
@@ -370,7 +371,7 @@ console.log('Company is:', company)
 
     try {
       // Same implementation as Web - uses https://wa.me/ URL
-      const dealLink = id ? `https://jomfood.my/?dealId=${id}&autoOpen=true` : 'https://jomfood.my';
+      const dealLink = id ? `${APP_WEB_BASE_URL}/?dealId=${id}&autoOpen=true` : APP_WEB_BASE_URL;
       const message = `Hi, I am interested in the deal ${name}.\nLink: ${dealLink}`;
       await openWhatsApp(officePhone, message);
     } catch (error) {

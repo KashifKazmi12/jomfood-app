@@ -360,6 +360,10 @@
     "pullToRefresh": "Tarik untuk muat semula",
     "allRead": "Semua notifikasi dibaca"
   },
+  "referral": {
+    "shareTitle": "Daftar dengan JomFood",
+    "shareInviteFull": "Hei! Daftar dengan JomFood dan nikmati tawaran terbaik untuk anda. Sila gunakan kod rujukan ini: {{code}}\n\n{{url}}"
+  },
   "privacyPolicy": {
     "title": "Dasar Privasi untuk jomfood.my",
     "lastUpdated": "Kemaskini terakhir",

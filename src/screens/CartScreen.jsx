@@ -43,6 +43,7 @@ export default function CartScreen() {
   const [couponCode, setCouponCode] = useState('');
   const [couponPreview, setCouponPreview] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
+  const [dateTimeError, setDateTimeError] = useState(false);
 
   const availableServiceTypes = useMemo(() => {
     if (!items.length) return [];
@@ -119,6 +120,7 @@ export default function CartScreen() {
           } else {
             setPreferredTimeValue(selectedDate);
           }
+          setDateTimeError(false);
         },
       });
       return;
@@ -134,6 +136,7 @@ export default function CartScreen() {
         onChange: (event, selectedDate) => {
           if (event.type !== 'set' || !selectedDate) return;
           setPreferredDateValue(selectedDate);
+          setDateTimeError(false);
           DateTimePickerAndroid.open({
             value: preferredTimeValue || new Date(),
             mode: 'time',
@@ -141,6 +144,7 @@ export default function CartScreen() {
             onChange: (timeEvent, selectedTime) => {
               if (timeEvent.type !== 'set' || !selectedTime) return;
               setPreferredTimeValue(selectedTime);
+              setDateTimeError(false);
             },
           });
         },
@@ -176,6 +180,7 @@ export default function CartScreen() {
     if (preferredServiceType === 'delivery') {
       setPreferredDateValue(null);
       setPreferredTimeValue(null);
+      setDateTimeError(false);
     }
   }, [preferredServiceType]);
 
@@ -231,7 +236,7 @@ export default function CartScreen() {
     if (preferredServiceType !== 'delivery') {
       const preferredDatetime = buildPreferredDatetime();
       if (!preferredDatetime) {
-        showToast.error('Error', t('cart.dateTimeRequired', 'Date and time are required'));
+        setDateTimeError(true);
         return;
       }
     }
@@ -433,12 +438,22 @@ export default function CartScreen() {
                     <>
                       <Text style={styles.sectionLabel}>{t('dealModal.preferredDateTime', 'Preferred Date & Time')}</Text>
                       <TouchableOpacity
-                        style={styles.dateTimeButtonFull}
-                        onPress={openCombinedDateTimePicker}
+                        style={[styles.dateTimeButtonFull, dateTimeError && styles.dateTimeButtonError]}
+                        onPress={() => {
+                          setDateTimeError(false);
+                          openCombinedDateTimePicker();
+                        }}
                       >
-                        <Calendar size={16} color={colors.textMuted} />
-                        <Text style={styles.dateTimeTextFull}>{formatDateTimeDisplay()}</Text>
+                        <Calendar size={16} color={dateTimeError ? '#dc2626' : colors.textMuted} />
+                        <Text style={[styles.dateTimeTextFull, dateTimeError && styles.dateTimeTextError]}>
+                          {formatDateTimeDisplay()}
+                        </Text>
                       </TouchableOpacity>
+                      {dateTimeError ? (
+                        <Text style={styles.dateTimeErrorText}>
+                          {t('cart.selectDateTimeInline', 'Please select a date and time.')}
+                        </Text>
+                      ) : null}
                       {Platform.OS === 'ios' && showIosPicker && (
                         <View style={styles.iosPickerCard}>
                           <DateTimePicker
@@ -446,7 +461,10 @@ export default function CartScreen() {
                             mode="date"
                             display="inline"
                             onChange={(_, selectedDate) => {
-                              if (selectedDate) setPreferredDateValue(selectedDate);
+                              if (selectedDate) {
+                                setPreferredDateValue(selectedDate);
+                                setDateTimeError(false);
+                              }
                             }}
                           />
                           <DateTimePicker
@@ -454,7 +472,10 @@ export default function CartScreen() {
                             mode="time"
                             display="spinner"
                             onChange={(_, selectedDate) => {
-                              if (selectedDate) setPreferredTimeValue(selectedDate);
+                              if (selectedDate) {
+                                setPreferredTimeValue(selectedDate);
+                                setDateTimeError(false);
+                              }
                             }}
                           />
                           <TouchableOpacity
@@ -733,9 +754,22 @@ const getStyles = (colors, typography) => StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.backgroundLight,
   },
+  dateTimeButtonError: {
+    borderColor: '#dc2626',
+    backgroundColor: '#fef2f2',
+  },
   dateTimeTextFull: {
     fontSize: typography.fontSize.sm,
     color: colors.text,
+    fontFamily: typography.fontFamily.medium,
+  },
+  dateTimeTextError: {
+    color: '#dc2626',
+  },
+  dateTimeErrorText: {
+    marginTop: -4,
+    fontSize: typography.fontSize.xs,
+    color: '#dc2626',
     fontFamily: typography.fontFamily.medium,
   },
   deliveryNote: {

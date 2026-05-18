@@ -193,8 +193,22 @@ export default function MyDealsScreen() {
       if (!claim) return null;
       const deal = claim.deal_details || {};
       const businessName = claim.business_id?.company_name || claim.group_id?.name || 'Unknown Business';
-      const dealName = deal.deal_name || claim.deal_name || 'Deal';
-      const dealPrice = deal.deal_total || claim.deal_total || 0;
+      const cartLineItems = claim.is_consolidated_cart &&
+        Array.isArray(claim.cart_line_items) &&
+        claim.cart_line_items.length > 1
+        ? claim.cart_line_items.map((line) => ({
+            deal_name: line.deal_name,
+            quantity: line.quantity,
+          }))
+        : null;
+      const dealName = cartLineItems
+        ? null
+        : claim.is_consolidated_cart
+          ? (claim.deal_name || 'Deal')
+          : (deal.deal_name || claim.deal_name || 'Deal');
+      const dealPrice = Number(
+        claim.deal_total_after_coupon ?? claim.deal_total ?? deal.deal_total ?? 0
+      );
       
       // Format date
       const formatDate = (dateString) => {
@@ -224,6 +238,7 @@ export default function MyDealsScreen() {
         id: claim._id,
         dealId: claim.deal_id?._id || claim.deal_id,
         dealName,
+        cartLineItems,
         businessName,
         price: dealPrice,
         status,
@@ -404,9 +419,21 @@ export default function MyDealsScreen() {
     >
       <View style={styles.historyItemContent}>
         <View style={styles.historyItemHeader}>
-          <Text style={styles.historyDealName} numberOfLines={1} ellipsizeMode="tail">
-            {claim.dealName}
-          </Text>
+          {claim.cartLineItems?.length > 1 ? (
+            <Text style={styles.historyDealName} numberOfLines={2}>
+              {claim.cartLineItems.map((line, index) => (
+                <React.Fragment key={`${line.deal_name}-${index}`}>
+                  {index > 0 ? <Text style={styles.historyDealName}> · </Text> : null}
+                  <Text style={styles.historyDealName}>{line.deal_name}</Text>
+                  <Text style={styles.historyDealQty}> ×{line.quantity}</Text>
+                </React.Fragment>
+              ))}
+            </Text>
+          ) : (
+            <Text style={styles.historyDealName} numberOfLines={1} ellipsizeMode="tail">
+              {claim.dealName || 'Deal'}
+            </Text>
+          )}
           <View style={styles.statusBadgeContainer}>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(claim.status) + '20' }]}>
             {getStatusIcon(claim.status)}
@@ -1032,6 +1059,11 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontWeight: "700",
     color: colors.textMuted,
     marginBottom: 0,
+  },
+  historyDealQty: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: '600',
+    color: colors.textMuted,
   },
   historyItemFooter: {
     flexDirection: 'row',

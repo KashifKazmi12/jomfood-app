@@ -227,6 +227,12 @@ export const dealsAPI = {
     return res?.data || res;
   },
 
+  getRedeemInstructions: async () => {
+    const res = await api.get('/jomfood-deals/redeem-instructions');
+    if (res?.success && res?.data) return res.data;
+    return null;
+  },
+
   getDealOfTheDay: async () => {
     const lang = getApiLanguage();
     const langParam = (lang && typeof lang === 'string') ? `?lang=${lang}` : '';

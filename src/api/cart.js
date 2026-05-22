@@ -43,6 +43,13 @@ export const cartAPI = {
     const query = queryParams.toString();
     return api.get(`/jomfood-deals/cart/payment-status${query ? `?${query}` : ''}`);
   },
+  setCartPurchasePreferences: async (purchaseId, customerId, preferredServiceType, preferredDatetime) => {
+    return api.post(`/jomfood-deals/cart/purchases/${purchaseId}/preferences`, {
+      customer_id: customerId,
+      preferred_service_type: preferredServiceType,
+      preferred_datetime: preferredDatetime,
+    });
+  },
 };
 
 export default cartAPI;

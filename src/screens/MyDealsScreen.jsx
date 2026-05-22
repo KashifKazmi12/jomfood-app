@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import useThemeColors from '../theme/useThemeColors';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import GradientBackground from '../components/GradientBackground';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { dealsAPI } from '../api/deals';
@@ -26,6 +26,7 @@ export default function MyDealsScreen() {
   const typography = useThemeTypography();
   const styles = getStyles(colors, typography);
   const navigation = useNavigation();
+  const route = useRoute();
   const [selectedClaim, setSelectedClaim] = React.useState(null);
   const [bottomSheetVisible, setBottomSheetVisible] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('claimed'); // 'claimed' or 'favorites'
@@ -42,7 +43,7 @@ export default function MyDealsScreen() {
   const [cancelTarget, setCancelTarget] = React.useState(null);
 
   // Get user ID - try both _id and id
-  const userId = user?._id;
+  const userId = user?._id || user?.id;
   const isQueryEnabled = !!userId;
 
   // Force re-render when user state changes (fixes Google Sign-In state sync issue)
@@ -180,6 +181,58 @@ export default function MyDealsScreen() {
     // console.log('✅ [MyDealsScreen] Total flattened favorite deals:', flattened.length);
     return flattened;
   }, [favoriteDealsData]);
+
+  const rawClaims = useMemo(() => {
+    if (!claimHistoryData?.pages || !Array.isArray(claimHistoryData.pages)) return [];
+    return claimHistoryData.pages.flatMap((page) => (page?.claims && Array.isArray(page.claims) ? page.claims : []));
+  }, [claimHistoryData]);
+
+  const openedClaimFromPaymentRef = React.useRef(false);
+  const openClaimPollCountRef = React.useRef(0);
+
+  const tryOpenClaimFromPayment = React.useCallback(() => {
+    const openClaimId = route.params?.openClaimId;
+    if (!openClaimId || openedClaimFromPaymentRef.current) return false;
+
+    const targetId = String(openClaimId);
+    const match = rawClaims.find(
+      (c) => String(c?._id) === targetId || String(c?.cart_purchase_id || '') === targetId
+    );
+    if (!match) return false;
+
+    openedClaimFromPaymentRef.current = true;
+    openClaimPollCountRef.current = 0;
+    setActiveTab('claimed');
+    setSelectedClaim(match);
+    setBottomSheetVisible(true);
+    navigation.setParams({ openClaimId: undefined });
+    return true;
+  }, [route.params?.openClaimId, rawClaims, navigation]);
+
+  useEffect(() => {
+    openClaimPollCountRef.current = 0;
+  }, [route.params?.openClaimId]);
+
+  useEffect(() => {
+    if (isLoadingHistory || isRefetching) return;
+    if (tryOpenClaimFromPayment()) return undefined;
+
+    const openClaimId = route.params?.openClaimId;
+    if (!openClaimId || openedClaimFromPaymentRef.current) return undefined;
+    if (openClaimPollCountRef.current >= 8) return undefined;
+
+    const timer = setTimeout(() => {
+      openClaimPollCountRef.current += 1;
+      refetch();
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [isLoadingHistory, isRefetching, tryOpenClaimFromPayment, route.params?.openClaimId, refetch]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      tryOpenClaimFromPayment();
+    }, [tryOpenClaimFromPayment])
+  );
 
   // Flatten all pages of claims and format for history display
   const claimHistory = useMemo(() => {
@@ -766,6 +819,8 @@ export default function MyDealsScreen() {
             setSelectedClaim(null);
           }}
           data={selectedClaim}
+          customerId={userId}
+          onPreferencesSaved={() => refetch()}
         />
       </View>
       </SafeAreaView>

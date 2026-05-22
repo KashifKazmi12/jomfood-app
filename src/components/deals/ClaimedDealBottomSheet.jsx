@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { 
   Modal, 
   View, 
@@ -11,9 +11,12 @@ import {
   Animated,
   Dimensions,
   TouchableWithoutFeedback,
-  Platform
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import useThemeTypography from '../../theme/useThemeTypography';
 
 const AnimatedView = Animated.createAnimatedComponent(View);
@@ -22,18 +25,36 @@ import ViewShot from 'react-native-view-shot';
 import RNFS from 'react-native-fs';
 import useThemeColors from '../../theme/useThemeColors';
 import { showToast } from '../toast';
-import { X, Calendar, MapPin, DollarSign, Clock, CheckCircle, XCircle, Eye, EyeOff, ExternalLink, ShoppingBag } from 'lucide-react-native';
+import { X, Calendar, MapPin, DollarSign, Clock, CheckCircle, XCircle, Eye, EyeOff, ExternalLink, ShoppingBag, Truck, UtensilsCrossed } from 'lucide-react-native';
+import { cartAPI } from '../../api/cart';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DRAG_THRESHOLD = 100; // Minimum drag distance to close
 
-export default function ClaimedDealBottomSheet({ visible, onClose, data }) {
+const SERVICE_TYPE_MAP = {
+  delivery: 'delivery',
+  'dine-in': 'dine_in',
+  self_pickup: 'pickup',
+};
+
+export default function ClaimedDealBottomSheet({ visible, onClose, data, customerId, onPreferencesSaved }) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const typography = useThemeTypography();
   const styles = getStyles(colors, typography);
   const navigation = useNavigation();
   const [isSaved, setIsSaved] = useState(false);
   const [howToOpen, setHowToOpen] = useState(false);
+  const [preferredServiceType, setPreferredServiceType] = useState('');
+  const [preferredDateValue, setPreferredDateValue] = useState(null);
+  const [preferredTimeValue, setPreferredTimeValue] = useState(null);
+  const [dateTimeError, setDateTimeError] = useState(false);
+  const [savingPreferences, setSavingPreferences] = useState(false);
+  const [showIosPicker, setShowIosPicker] = useState(false);
+
+  const preferencesPending = Boolean(data?.preferences_pending);
+  const availableServiceTypes = Array.isArray(data?.available_service_types) ? data.available_service_types : [];
+  const cartPurchaseId = data?.cart_purchase_id?._id ?? data?.cart_purchase_id ?? null;
   const qrImageRef = useRef(null);
   const translateY = useRef(new Animated.Value(0)).current;
   const dragStartY = useRef(null);
@@ -89,6 +110,124 @@ export default function ClaimedDealBottomSheet({ visible, onClose, data }) {
       onShouldBlockNativeResponder: () => false,
     })
   ).current;
+
+  useEffect(() => {
+    if (!data) return;
+    const reverseMap = { delivery: 'delivery', pickup: 'self_pickup', dine_in: 'dine-in' };
+    if (data.preferred_service_type) {
+      setPreferredServiceType(reverseMap[data.preferred_service_type] || '');
+    } else if (availableServiceTypes[0]) {
+      setPreferredServiceType(availableServiceTypes[0]);
+    }
+    if (data.preferred_datetime) {
+      const dt = new Date(data.preferred_datetime);
+      setPreferredDateValue(dt);
+      setPreferredTimeValue(dt);
+    } else {
+      setPreferredDateValue(null);
+      setPreferredTimeValue(null);
+    }
+    setDateTimeError(false);
+  }, [data, availableServiceTypes]);
+
+  const formatDateTimeDisplay = () => {
+    if (!preferredDateValue || !preferredTimeValue) {
+      return t('dealModal.preferredDateTime', 'Preferred Date & Time');
+    }
+    const dateText = preferredDateValue.toLocaleDateString('en-US');
+    const timeText = preferredTimeValue.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return `${dateText} ${timeText}`;
+  };
+
+  const openCombinedDateTimePicker = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: preferredDateValue || new Date(),
+        mode: 'date',
+        is24Hour: false,
+        onChange: (event, selectedDate) => {
+          if (event.type !== 'set' || !selectedDate) return;
+          setPreferredDateValue(selectedDate);
+          setDateTimeError(false);
+          DateTimePickerAndroid.open({
+            value: preferredTimeValue || new Date(),
+            mode: 'time',
+            is24Hour: false,
+            onChange: (timeEvent, selectedTime) => {
+              if (timeEvent.type !== 'set' || !selectedTime) return;
+              setPreferredTimeValue(selectedTime);
+              setDateTimeError(false);
+            },
+          });
+        },
+      });
+      return;
+    }
+    setShowIosPicker(true);
+  };
+
+  const handleSavePreferences = useCallback(async () => {
+    const purchaseId = cartPurchaseId ? String(cartPurchaseId) : '';
+    const resolvedCustomerId = customerId ? String(customerId) : '';
+    if (!resolvedCustomerId || !purchaseId) {
+      showToast.error('Error', t('myDeals.preferencesSaveFailed', 'Failed to save preferences'));
+      return;
+    }
+    if (!preferredServiceType) {
+      showToast.error('Error', t('cart.serviceTypeRequired', 'Service type is required'));
+      return;
+    }
+    if (preferredServiceType !== 'delivery' && (!preferredDateValue || !preferredTimeValue)) {
+      setDateTimeError(true);
+      return;
+    }
+    const backendType = SERVICE_TYPE_MAP[preferredServiceType];
+    let preferredDatetime = null;
+    if (preferredServiceType !== 'delivery' && preferredDateValue && preferredTimeValue) {
+      preferredDatetime = new Date(
+        preferredDateValue.getFullYear(),
+        preferredDateValue.getMonth(),
+        preferredDateValue.getDate(),
+        preferredTimeValue.getHours(),
+        preferredTimeValue.getMinutes(),
+        0,
+        0
+      ).toISOString();
+    }
+    try {
+      setSavingPreferences(true);
+      const response = await cartAPI.setCartPurchasePreferences(
+        purchaseId,
+        resolvedCustomerId,
+        backendType,
+        preferredDatetime
+      );
+      // api client returns JSON body directly: { success, message, data }
+      if (response?.success === true) {
+        showToast.success('Success', t('myDeals.preferencesSaved', 'Preferences saved successfully'));
+        onPreferencesSaved?.();
+        onClose?.();
+      } else {
+        showToast.error(
+          'Error',
+          response?.message || t('myDeals.preferencesSaveFailed', 'Failed to save preferences')
+        );
+      }
+    } catch (error) {
+      showToast.error('Error', error?.message || t('myDeals.preferencesSaveFailed', 'Failed to save preferences'));
+    } finally {
+      setSavingPreferences(false);
+    }
+  }, [
+    cartPurchaseId,
+    customerId,
+    onClose,
+    onPreferencesSaved,
+    preferredDateValue,
+    preferredServiceType,
+    preferredTimeValue,
+    t,
+  ]);
 
   // Reset saved state when modal closes
   React.useEffect(() => {
@@ -333,6 +472,105 @@ export default function ClaimedDealBottomSheet({ visible, onClose, data }) {
                 )}
               </View>
 
+              {preferencesPending && (
+                <View style={styles.preferencesBox}>
+                  <Text style={styles.preferencesTitle}>
+                    {t('myDeals.setPreferencesTitle', 'Set your service preferences')}
+                  </Text>
+                  <View style={styles.serviceTypeRow}>
+                    {availableServiceTypes.map((type) => {
+                      const isSelected = preferredServiceType === type;
+                      const Icon = type === 'delivery' ? Truck : type === 'dine-in' ? UtensilsCrossed : ShoppingBag;
+                      const label = type === 'delivery'
+                        ? t('common.delivery', 'Delivery')
+                        : type === 'dine-in'
+                          ? t('common.dineIn', 'Dine-in')
+                          : t('common.selfPickup', 'Self pickup');
+                      return (
+                        <TouchableOpacity
+                          key={type}
+                          style={[styles.serviceTypeButton, isSelected && styles.serviceTypeButtonActive]}
+                          onPress={() => setPreferredServiceType(type)}
+                        >
+                          <Icon size={14} color={isSelected ? colors.primary : colors.text} />
+                          <Text style={[styles.serviceTypeText, isSelected && styles.serviceTypeTextActive]}>
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  {preferredServiceType === 'delivery' ? (
+                    <Text style={styles.deliveryNote}>
+                      {t('cart.deliverySchedulingNote', 'Contact the restaurant for delivery charges and details.')}
+                    </Text>
+                  ) : (
+                    <>
+                      <Text style={styles.prefsLabel}>{t('dealModal.preferredDateTime', 'Preferred Date & Time')}</Text>
+                      <TouchableOpacity
+                        style={[styles.dateTimeButton, dateTimeError && styles.dateTimeButtonError]}
+                        onPress={() => {
+                          setDateTimeError(false);
+                          openCombinedDateTimePicker();
+                        }}
+                      >
+                        <Calendar size={16} color={dateTimeError ? '#dc2626' : colors.textMuted} />
+                        <Text style={[styles.dateTimeText, dateTimeError && styles.dateTimeTextError]}>
+                          {formatDateTimeDisplay()}
+                        </Text>
+                      </TouchableOpacity>
+                      {dateTimeError ? (
+                        <Text style={styles.dateTimeErrorText}>
+                          {t('cart.selectDateTimeInline', 'Please select a date and time.')}
+                        </Text>
+                      ) : null}
+                      {Platform.OS === 'ios' && showIosPicker && (
+                        <View style={styles.iosPickerCard}>
+                          <DateTimePicker
+                            value={preferredDateValue || new Date()}
+                            mode="date"
+                            display="inline"
+                            onChange={(_, selectedDate) => {
+                              if (selectedDate) {
+                                setPreferredDateValue(selectedDate);
+                                setDateTimeError(false);
+                              }
+                            }}
+                          />
+                          <DateTimePicker
+                            value={preferredTimeValue || new Date()}
+                            mode="time"
+                            display="spinner"
+                            onChange={(_, selectedDate) => {
+                              if (selectedDate) {
+                                setPreferredTimeValue(selectedDate);
+                                setDateTimeError(false);
+                              }
+                            }}
+                          />
+                          <TouchableOpacity style={styles.iosPickerDone} onPress={() => setShowIosPicker(false)}>
+                            <Text style={styles.iosPickerDoneText}>{t('common.done', 'Done')}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.savePreferencesButton, savingPreferences && styles.savePreferencesButtonDisabled]}
+                    onPress={handleSavePreferences}
+                    disabled={savingPreferences}
+                  >
+                    {savingPreferences ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.savePreferencesButtonText}>
+                        {t('myDeals.savePreferences', 'Save preferences')}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Deal Information */}
               <View style={styles.infoSection}>
                 <Text style={styles.sectionTitle}>Deal Information</Text>
@@ -353,21 +591,25 @@ export default function ClaimedDealBottomSheet({ visible, onClose, data }) {
                   </View>
                 </View>
 
-                <View style={styles.infoRow}>
-                  <ShoppingBag size={18} color={colors.textMuted} />
-                  <View style={styles.infoContent}>
-                    <Text style={styles.infoLabel}>Preferred Service Type</Text>
-                    <Text style={styles.infoValue}>{formatServiceType(data.preferred_service_type)}</Text>
+                {!preferencesPending && data.preferred_service_type ? (
+                  <View style={styles.infoRow}>
+                    <ShoppingBag size={18} color={colors.textMuted} />
+                    <View style={styles.infoContent}>
+                      <Text style={styles.infoLabel}>Preferred Service Type</Text>
+                      <Text style={styles.infoValue}>{formatServiceType(data.preferred_service_type)}</Text>
+                    </View>
                   </View>
-                </View>
+                ) : null}
 
-                <View style={styles.infoRow}>
-                  <Clock size={18} color={colors.textMuted} />
-                  <View style={styles.infoContent}>
-                    <Text style={styles.infoLabel}>Scheduled At</Text>
-                    <Text style={styles.infoValue}>{formatDate(data.preferred_datetime)}</Text>
+                {!preferencesPending && data.preferred_datetime ? (
+                  <View style={styles.infoRow}>
+                    <Clock size={18} color={colors.textMuted} />
+                    <View style={styles.infoContent}>
+                      <Text style={styles.infoLabel}>Scheduled At</Text>
+                      <Text style={styles.infoValue}>{formatDate(data.preferred_datetime)}</Text>
+                    </View>
                   </View>
-                </View>
+                ) : null}
 
                 {data.expires_at && (
                   <View style={styles.infoRow}>
@@ -633,6 +875,119 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily.regular,
     color: colors.textMuted,
+  },
+  preferencesBox: {
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    backgroundColor: '#fff7ed',
+    gap: 10,
+  },
+  preferencesTitle: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.semiBold,
+    color: '#9a3412',
+  },
+  serviceTypeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  serviceTypeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  serviceTypeButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLighter || colors.primary + '15',
+  },
+  serviceTypeText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text,
+    fontFamily: typography.fontFamily.medium,
+  },
+  serviceTypeTextActive: {
+    color: colors.primary,
+    fontFamily: typography.fontFamily.semiBold,
+  },
+  deliveryNote: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.regular,
+  },
+  prefsLabel: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.regular,
+    marginTop: 4,
+  },
+  dateTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: colors.surface,
+  },
+  dateTimeButtonError: {
+    borderColor: '#dc2626',
+  },
+  dateTimeText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text,
+    fontFamily: typography.fontFamily.regular,
+  },
+  dateTimeTextError: {
+    color: '#dc2626',
+  },
+  dateTimeErrorText: {
+    fontSize: typography.fontSize.xs,
+    color: '#dc2626',
+    fontFamily: typography.fontFamily.regular,
+  },
+  iosPickerCard: {
+    marginTop: 8,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+  },
+  iosPickerDone: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  iosPickerDoneText: {
+    color: colors.primary,
+    fontFamily: typography.fontFamily.semiBold,
+    fontSize: typography.fontSize.sm,
+  },
+  savePreferencesButton: {
+    marginTop: 4,
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  savePreferencesButtonDisabled: {
+    opacity: 0.7,
+  },
+  savePreferencesButtonText: {
+    color: '#fff',
+    fontFamily: typography.fontFamily.semiBold,
+    fontSize: typography.fontSize.sm,
   },
 });
 

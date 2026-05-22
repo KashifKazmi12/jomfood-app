@@ -14,8 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
-import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { Calendar, ShoppingBag, Trash2, Truck, UtensilsCrossed } from 'lucide-react-native';
+import { ShoppingBag, Trash2, Truck, UtensilsCrossed } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import GradientBackground from '../components/GradientBackground';
 import LoginPrompt from '../components/LoginPrompt';
@@ -35,15 +34,10 @@ export default function CartScreen() {
   const styles = useMemo(() => getStyles(colors, typography), [colors, typography]);
 
   const { items, businessName, totals, updateItemQuantity, removeItem, clearCart, loading, reload } = useCart();
-  const [preferredServiceType, setPreferredServiceType] = useState('');
-  const [preferredDateValue, setPreferredDateValue] = useState(null);
-  const [preferredTimeValue, setPreferredTimeValue] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [showIosPicker, setShowIosPicker] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponPreview, setCouponPreview] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
-  const [dateTimeError, setDateTimeError] = useState(false);
 
   const availableServiceTypes = useMemo(() => {
     if (!items.length) return [];
@@ -52,107 +46,6 @@ export default function CartScreen() {
     if (intersection.length) return intersection;
     return Array.from(new Set(mapped.flat()));
   }, [items]);
-
-  useEffect(() => {
-    if (!items.length || availableServiceTypes.length === 0) {
-      if (preferredServiceType) {
-        setPreferredServiceType('');
-      }
-      return;
-    }
-
-    if (!availableServiceTypes.includes(preferredServiceType)) {
-      setPreferredServiceType(availableServiceTypes[0]);
-    }
-  }, [availableServiceTypes, items.length, preferredServiceType]);
-
-  const serviceTypeMap = {
-    delivery: 'delivery',
-    'dine-in': 'dine_in',
-    self_pickup: 'pickup',
-  };
-
-  const formatDateDisplay = (dateValue) => {
-    if (!dateValue) return '';
-    return dateValue.toLocaleDateString('en-US');
-  };
-
-  const formatTimeDisplay = (timeValue) => {
-    if (!timeValue) return '';
-    return timeValue.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  };
-
-  const formatDateTimeDisplay = () => {
-    if (!preferredDateValue || !preferredTimeValue) {
-      return t('dealModal.preferredDateTime', 'Preferred Date & Time');
-    }
-    const dateText = formatDateDisplay(preferredDateValue);
-    const timeText = formatTimeDisplay(preferredTimeValue);
-    return `${dateText} ${timeText}`;
-  };
-
-  const buildPreferredDatetime = () => {
-    if (!preferredDateValue || !preferredTimeValue) return null;
-    return new Date(
-      preferredDateValue.getFullYear(),
-      preferredDateValue.getMonth(),
-      preferredDateValue.getDate(),
-      preferredTimeValue.getHours(),
-      preferredTimeValue.getMinutes(),
-      0,
-      0
-    );
-  };
-
-  const openDateTimePicker = (mode) => {
-    if (Platform.OS === 'android') {
-      const currentValue = mode === 'date'
-        ? (preferredDateValue || new Date())
-        : (preferredTimeValue || new Date());
-      DateTimePickerAndroid.open({
-        value: currentValue,
-        mode,
-        is24Hour: false,
-        onChange: (event, selectedDate) => {
-          if (event.type !== 'set' || !selectedDate) return;
-          if (mode === 'date') {
-            setPreferredDateValue(selectedDate);
-          } else {
-            setPreferredTimeValue(selectedDate);
-          }
-          setDateTimeError(false);
-        },
-      });
-      return;
-    }
-  };
-
-  const openCombinedDateTimePicker = () => {
-    if (Platform.OS === 'android') {
-      DateTimePickerAndroid.open({
-        value: preferredDateValue || new Date(),
-        mode: 'date',
-        is24Hour: false,
-        onChange: (event, selectedDate) => {
-          if (event.type !== 'set' || !selectedDate) return;
-          setPreferredDateValue(selectedDate);
-          setDateTimeError(false);
-          DateTimePickerAndroid.open({
-            value: preferredTimeValue || new Date(),
-            mode: 'time',
-            is24Hour: false,
-            onChange: (timeEvent, selectedTime) => {
-              if (timeEvent.type !== 'set' || !selectedTime) return;
-              setPreferredTimeValue(selectedTime);
-              setDateTimeError(false);
-            },
-          });
-        },
-      });
-      return;
-    }
-    setShowIosPicker(true);
-  };
 
   const confirmRemoveItem = (itemId, itemName) => {
     Alert.alert(
@@ -175,14 +68,6 @@ export default function CartScreen() {
       ]
     );
   };
-
-  useEffect(() => {
-    if (preferredServiceType === 'delivery') {
-      setPreferredDateValue(null);
-      setPreferredTimeValue(null);
-      setDateTimeError(false);
-    }
-  }, [preferredServiceType]);
 
   const fetchCouponPreview = useCallback(async (code = null, showError = false) => {
     if (!user?._id || !items.length) {
@@ -229,28 +114,12 @@ export default function CartScreen() {
       navigation.navigate('Profile');
       return;
     }
-    if (availableServiceTypes.length > 0 && !preferredServiceType) {
-      showToast.error('Error', t('cart.serviceTypeRequired', 'Service type is required'));
-      return;
-    }
-    if (preferredServiceType !== 'delivery') {
-      const preferredDatetime = buildPreferredDatetime();
-      if (!preferredDatetime) {
-        setDateTimeError(true);
-        return;
-      }
-    }
-
-    const preferredDatetime = preferredServiceType === 'delivery'
-      ? null
-      : buildPreferredDatetime()?.toISOString();
-
     try {
       setSubmitting(true);
       const response = await cartAPI.checkoutCart(
         user._id,
-        preferredServiceType ? serviceTypeMap[preferredServiceType] : null,
-        preferredDatetime,
+        null,
+        null,
         couponPreview?.applied_coupon?.source === 'manual'
           ? couponPreview?.applied_coupon?.coupon_code
           : null
@@ -281,11 +150,10 @@ export default function CartScreen() {
       setSubmitting(false);
     }
   }, [
-    availableServiceTypes.length,
-    buildPreferredDatetime,
+    couponPreview?.applied_coupon?.coupon_code,
+    couponPreview?.applied_coupon?.source,
     items.length,
     navigation,
-    preferredServiceType,
     reload,
     t,
     user?._id,
@@ -366,6 +234,42 @@ export default function CartScreen() {
                   ))}
                 </View>
 
+                {availableServiceTypes.length > 0 && (
+                  <View style={styles.consumptionSection}>
+                    <View style={styles.consumptionBadges}>
+                      {availableServiceTypes.map((type) => {
+                        const Icon = type === 'delivery' ? Truck : type === 'dine-in' ? UtensilsCrossed : ShoppingBag;
+                        const label = type === 'delivery'
+                          ? t('common.delivery')
+                          : type === 'dine-in'
+                            ? t('common.dineIn')
+                            : t('common.selfPickup');
+                        const badgeStyle = type === 'delivery'
+                          ? styles.deliveryBadge
+                          : type === 'dine-in'
+                            ? styles.dineInBadge
+                            : styles.pickupBadge;
+                        const textStyle = type === 'delivery'
+                          ? styles.deliveryText
+                          : type === 'dine-in'
+                            ? styles.dineInText
+                            : styles.pickupText;
+                        const iconColor = type === 'delivery'
+                          ? '#2563EB'
+                          : type === 'dine-in'
+                            ? '#16A34A'
+                            : '#EA580C';
+                        return (
+                          <View key={type} style={[styles.consumptionBadge, badgeStyle]}>
+                            <Icon size={12} color={iconColor} />
+                            <Text style={[styles.consumptionBadgeText, textStyle]}>{label}</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
                 <View style={styles.preferences}>
                   {couponPreview?.applied_coupon?.source === 'first_time' ? (
                     <View style={styles.firstTimeBanner}>
@@ -403,91 +307,6 @@ export default function CartScreen() {
                     </View>
                   )}
 
-                  <Text style={styles.sectionTitle}>{t('cart.preferences', 'Preferences')}</Text>
-                  <View style={styles.serviceTypeRow}>
-                    {availableServiceTypes.map((type) => {
-                      const isSelected = preferredServiceType === type;
-                      const Icon = type === 'delivery' ? Truck : type === 'dine-in' ? UtensilsCrossed : ShoppingBag;
-                      const label = type === 'delivery'
-                        ? t('common.delivery')
-                        : type === 'dine-in'
-                          ? t('common.dineIn')
-                          : t('common.selfPickup');
-                      return (
-                        <TouchableOpacity
-                          key={type}
-                          style={[styles.serviceTypeButton, isSelected && styles.serviceTypeButtonActive]}
-                          onPress={() => setPreferredServiceType(type)}
-                        >
-                          <Icon size={14} color={isSelected ? colors.primary : colors.text} />
-                          <Text style={[styles.serviceTypeText, isSelected && styles.serviceTypeTextActive]}>
-                            {label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-
-                  {preferredServiceType === 'delivery' ? (
-                    <View style={styles.deliveryNote}>
-                      <Text style={styles.deliveryNoteText}>
-                        {t('cart.deliverySchedulingNote', 'Contact the restaurant for delivery charges and details.')}
-                      </Text>
-                    </View>
-                  ) : (
-                    <>
-                      <Text style={styles.sectionLabel}>{t('dealModal.preferredDateTime', 'Preferred Date & Time')}</Text>
-                      <TouchableOpacity
-                        style={[styles.dateTimeButtonFull, dateTimeError && styles.dateTimeButtonError]}
-                        onPress={() => {
-                          setDateTimeError(false);
-                          openCombinedDateTimePicker();
-                        }}
-                      >
-                        <Calendar size={16} color={dateTimeError ? '#dc2626' : colors.textMuted} />
-                        <Text style={[styles.dateTimeTextFull, dateTimeError && styles.dateTimeTextError]}>
-                          {formatDateTimeDisplay()}
-                        </Text>
-                      </TouchableOpacity>
-                      {dateTimeError ? (
-                        <Text style={styles.dateTimeErrorText}>
-                          {t('cart.selectDateTimeInline', 'Please select a date and time.')}
-                        </Text>
-                      ) : null}
-                      {Platform.OS === 'ios' && showIosPicker && (
-                        <View style={styles.iosPickerCard}>
-                          <DateTimePicker
-                            value={preferredDateValue || new Date()}
-                            mode="date"
-                            display="inline"
-                            onChange={(_, selectedDate) => {
-                              if (selectedDate) {
-                                setPreferredDateValue(selectedDate);
-                                setDateTimeError(false);
-                              }
-                            }}
-                          />
-                          <DateTimePicker
-                            value={preferredTimeValue || new Date()}
-                            mode="time"
-                            display="spinner"
-                            onChange={(_, selectedDate) => {
-                              if (selectedDate) {
-                                setPreferredTimeValue(selectedDate);
-                                setDateTimeError(false);
-                              }
-                            }}
-                          />
-                          <TouchableOpacity
-                            style={styles.iosPickerDone}
-                            onPress={() => setShowIosPicker(false)}
-                          >
-                            <Text style={styles.iosPickerDoneText}>{t('common.done', 'Done')}</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </>
-                  )}
                 </View>
 
                 <View style={styles.summary}>
@@ -644,8 +463,12 @@ const getStyles = (colors, typography) => StyleSheet.create({
     padding: 6,
   },
   preferences: {
-    marginTop: 16,
-    padding: 12,
+    marginTop: 10,
+    paddingTop: 12,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
     borderRadius: 12,
     backgroundColor: colors.white,
     borderWidth: 1,
@@ -710,6 +533,48 @@ const getStyles = (colors, typography) => StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.text,
     fontFamily: typography.fontFamily.semiBold,
+  },
+  consumptionSection: {
+    marginTop: 10,
+  },
+  consumptionBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  consumptionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  deliveryBadge: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+  },
+  dineInBadge: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#BBF7D0',
+  },
+  pickupBadge: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
+  },
+  consumptionBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.medium,
+  },
+  deliveryText: {
+    color: '#2563EB',
+  },
+  dineInText: {
+    color: '#16A34A',
+  },
+  pickupText: {
+    color: '#EA580C',
   },
   serviceTypeRow: {
     flexDirection: 'row',

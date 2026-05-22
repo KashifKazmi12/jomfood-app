@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { ActivityIndicator, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { ActivityIndicator, Animated, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react-native';
@@ -11,6 +11,8 @@ import { useCart } from '../context/CartContext';
 import useThemeColors from '../theme/useThemeColors';
 import useThemeTypography from '../theme/useThemeTypography';
 
+const AUTO_REDIRECT_MS = 3000;
+
 export default function CartPaymentStatusScreen() {
   const { t } = useTranslation();
   const route = useRoute();
@@ -21,10 +23,15 @@ export default function CartPaymentStatusScreen() {
   const { reload, clearCart } = useCart();
   const queryClient = useQueryClient();
   const clearedRef = useRef(false);
+  const autoRedirectCancelledRef = useRef(false);
+  const redirectTimerRef = useRef(null);
+  const progressAnim = useRef(new Animated.Value(0)).current;
 
   const paymentId = route.params?.paymentId;
   const paymentUrl = route.params?.paymentUrl;
   const [status, setStatus] = useState('pending');
+  const [claimId, setClaimId] = useState(null);
+  const [cartPurchaseId, setCartPurchaseId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,6 +43,8 @@ export default function CartPaymentStatusScreen() {
         const payload = response?.data?.data || response?.data || response || {};
         const nextStatus = payload?.status || 'pending';
         setStatus(nextStatus);
+        setClaimId(payload?.claim_id || payload?.claim_result?.data?.claim_id || null);
+        setCartPurchaseId(payload?.cart_purchase_id || payload?.claim_result?.data?.cart_purchase_id || null);
         if (nextStatus === 'paid' || nextStatus === 'failed' || nextStatus === 'cancelled') {
           clearInterval(intervalId);
           reload?.();
@@ -60,6 +69,65 @@ export default function CartPaymentStatusScreen() {
   const isSuccess = status === 'paid';
   const isFailed = status === 'failed' || status === 'cancelled';
 
+  const cancelAutoRedirect = useCallback(() => {
+    autoRedirectCancelledRef.current = true;
+    progressAnim.stopAnimation();
+    if (redirectTimerRef.current) {
+      clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = null;
+    }
+  }, [progressAnim]);
+
+  const openClaimId = claimId || cartPurchaseId;
+
+  const handleViewDeal = useCallback(() => {
+    cancelAutoRedirect();
+    clearCart?.();
+    queryClient.invalidateQueries({ queryKey: ['claim-history'] });
+    navigation.navigate('RootTabs', {
+      screen: 'MyDeals',
+      params: {
+        screen: 'MyDealsMain',
+        params: openClaimId ? { openClaimId: String(openClaimId) } : undefined,
+      },
+    });
+  }, [cancelAutoRedirect, clearCart, openClaimId, navigation, queryClient]);
+
+  const handleViewDealRef = useRef(handleViewDeal);
+  handleViewDealRef.current = handleViewDeal;
+
+  useEffect(() => {
+    if (!isSuccess || !openClaimId) return undefined;
+
+    autoRedirectCancelledRef.current = false;
+    progressAnim.setValue(0);
+    const anim = Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: AUTO_REDIRECT_MS,
+      useNativeDriver: false,
+    });
+    anim.start();
+
+    redirectTimerRef.current = setTimeout(() => {
+      if (!autoRedirectCancelledRef.current) {
+        handleViewDealRef.current();
+      }
+    }, AUTO_REDIRECT_MS);
+
+    return () => {
+      anim.stop();
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current);
+        redirectTimerRef.current = null;
+      }
+    };
+  }, [isSuccess, openClaimId, progressAnim]);
+
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
   return (
     <GradientBackground>
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -81,21 +149,28 @@ export default function CartPaymentStatusScreen() {
                   <CheckCircle size={44} color={colors.primary} />
                 </View>
                 <Text style={styles.title}>{t('cart.paymentSuccess', 'Payment successful')}</Text>
-                <Text style={styles.subtitle}>{t('cart.paymentSuccessHint', 'Payment confirmed. Your deals are ready.')}</Text>
+                <Text style={styles.subtitle}>{t('cart.paymentSuccessSetPreferences', 'Payment confirmed. Open your deal to set service preferences.')}</Text>
+                {openClaimId ? (
+                  <>
+                    <Text style={styles.redirectHint}>
+                      {t('cart.redirectingToMyDeals', 'Redirecting to your deal...')}
+                    </Text>
+                    <View style={styles.progressTrack}>
+                      <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
+                    </View>
+                  </>
+                ) : null}
                 <View style={styles.actionRow}>
                   <TouchableOpacity
                     style={[styles.primaryButton, styles.actionButton]}
-                    onPress={() => {
-                      clearCart?.();
-                      queryClient.invalidateQueries({ queryKey: ['claim-history'] });
-                      navigation.navigate('RootTabs', { screen: 'MyDeals' });
-                    }}
+                    onPress={handleViewDeal}
                   >
-                    <Text style={styles.primaryButtonText}>{t('cart.viewMyDeals', 'View My Deals')}</Text>
+                    <Text style={styles.primaryButtonText}>{t('cart.viewDeal', 'View Deal')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.secondaryButton, styles.actionButton]}
                     onPress={() => {
+                      cancelAutoRedirect();
                       clearCart?.();
                       queryClient.invalidateQueries({ queryKey: ['claim-history'] });
                       navigation.navigate('RootTabs', { screen: 'Home' });
@@ -190,6 +265,28 @@ const getStyles = (colors, typography) => StyleSheet.create({
     color: colors.textMuted,
     fontFamily: typography.fontFamily.regular,
     textAlign: 'center',
+  },
+  redirectHint: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.regular,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  progressTrack: {
+    width: '100%',
+    maxWidth: 280,
+    height: 6,
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 999,
+    overflow: 'hidden',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 999,
   },
   actionRow: {
     width: '100%',

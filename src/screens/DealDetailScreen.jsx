@@ -20,6 +20,7 @@ import Svg, { Path } from 'react-native-svg';
 import { BottomNavigationSpace } from '../navigation/AppNavigator';
 import { useCart } from '../context/CartContext';
 import ShareDealModal from '../components/deals/ShareDealModal';
+import DealRedeemInstructionsPanel from '../components/deals/DealRedeemInstructionsPanel';
 import PhoneNumberInput from '../components/common/PhoneNumberInput';
 import { APP_WEB_BASE_URL } from '../config/api';
 
@@ -50,6 +51,12 @@ export default function DealDetailScreen() {
   const [phoneError, setPhoneError] = useState('');
   const [phoneSaving, setPhoneSaving] = useState(false);
   const [pendingClaim, setPendingClaim] = useState(false); // Track if we need to claim after phone is saved
+
+  const { data: redeemInstructions } = useQuery({
+    queryKey: ['redeem-instructions'],
+    queryFn: () => dealsAPI.getRedeemInstructions(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['deal', id],
@@ -664,35 +671,16 @@ console.log('Company is:', company)
             )}
           </View>
 
-          {/* Consumption Types Section */}
           {consumptionTypes.length > 0 && (
             <View style={styles.consumptionSection}>
-              <View style={styles.consumptionBadges}>
-                {consumptionTypes.includes('delivery') && (
-                  <View style={[styles.consumptionBadge, styles.deliveryBadge]}>
-                    <Truck size={12} color="#2563EB" />
-                    <Text style={[styles.consumptionBadgeText, styles.deliveryText]}>
-                      {t('common.delivery')}
-                    </Text>
-                  </View>
-                )}
-                {consumptionTypes.includes('dine-in') && (
-                  <View style={[styles.consumptionBadge, styles.dineInBadge]}>
-                    <UtensilsCrossed size={12} color="#16A34A" />
-                    <Text style={[styles.consumptionBadgeText, styles.dineInText]}>
-                      {t('common.dineIn')}
-                    </Text>
-                  </View>
-                )}
-                {consumptionTypes.includes('self_pickup') && (
-                  <View style={[styles.consumptionBadge, styles.pickupBadge]}>
-                    <ShoppingBag size={12} color="#EA580C" />
-                    <Text style={[styles.consumptionBadgeText, styles.pickupText]}>
-                      {t('common.selfPickup')}
-                    </Text>
-                  </View>
-                )}
-              </View>
+              <DealRedeemInstructionsPanel
+                consumptionTypes={consumptionTypes}
+                redeemInstructions={redeemInstructions}
+                styles={styles.redeemPanel}
+                primaryColor={colors.primary}
+                descriptionFontSize={typography.fontSize.base}
+                descriptionColor={colors.textMuted}
+              />
             </View>
           )}
           {timeRemaining?.expired && (
@@ -1420,6 +1408,23 @@ const getStyles = (colors, typography) => StyleSheet.create({
   },
   pickupText: {
     color: '#EA580C',
+  },
+  redeemPanel: {
+    deliveryBadge: {
+      backgroundColor: '#EFF6FF',
+      borderColor: '#BFDBFE',
+    },
+    deliveryText: { color: '#2563EB' },
+    dineInBadge: {
+      backgroundColor: '#F0FDF4',
+      borderColor: '#BBF7D0',
+    },
+    dineInText: { color: '#16A34A' },
+    pickupBadge: {
+      backgroundColor: '#FFF7ED',
+      borderColor: '#FED7AA',
+    },
+    pickupText: { color: '#EA580C' },
   },
   dealImageContainer: {
     width: Dimensions.get('window').width - 40, // Full width minus horizontal padding (20*2)
